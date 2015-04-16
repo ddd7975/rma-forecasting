@@ -280,7 +280,7 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   return(list(c(minY, minM, minD), dataComp_c, datShipPro, dat_censored1, n_break, dat_future_shipping_pro, estEmpirical))
 }
 # ----- Nonparametric Estimation
-rmaNonparametric <- function(YMD, dataM, alfa = 0.05, minNi = 5){
+rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
   minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
   dataComp_c <- dataM[[2]]
   datShipPro <- dataM[[3]]
@@ -437,7 +437,7 @@ rmaNonparametric <- function(YMD, dataM, alfa = 0.05, minNi = 5){
     for (i in 1:length(fti)){
       var_Fti[i] <- (sti[i])^2*sum(tmp1[1:i])
     }
-    z <- qnorm(1 - alfa)
+    z <- qnorm(1 - alpha)
     # ----- 1. log transformation
     w <- exp(z*sqrt(var_Fti)/(fti*(1 - fti)))
     Fti_Lower <- fti/(fti + (1 - fti)*w)
@@ -790,10 +790,9 @@ selectNi <- function(dataM, YMD, maxNi = 5){
   MVTrend <- EstStorage[[minNi]][, 4]
   EstModified <- EstStorage[[minNi]][, 5]
   
-  dataFrame <- data.frame(x = xDate, nb = nb, Est=Est, Lower = Lower, Upper = Upper, 
+  dataFrame <- data.frame(x = xDate, nb = nb, Est = Est, Lower = Lower, Upper = Upper, 
                           MVTrend = MVTrend, EstModified = EstModified, Empirical = dataM[[7]])
   ## use time series to let the estimation close to the truth.
-  ## 暫時先在這裡算，但其實應該是要在迴圈裏面計算考慮nb time series。  
   ## ind is set as 30, because the frequency in time series is set as 12, it need at least 2 period.
   ind <- 30
   est.ts <- rep(0, nrow(dataFrame))
@@ -811,6 +810,8 @@ selectNi <- function(dataM, YMD, maxNi = 5){
     dValue <- mean(diffValue[(length(diffValue) - 5):length(diffValue)])
     est.ts[r] <- dataFrame[r, "EstModified"] - dValue
   }
+  neg <- which(est.ts < 0)
+  if (length(neg) > 0){est.ts[neg] <- 0}
   dataFrame <- cbind(dataFrame, EstTs = est.ts)
   return(dataFrame)
 }
