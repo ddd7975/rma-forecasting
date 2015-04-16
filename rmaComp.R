@@ -320,12 +320,6 @@ rmaNonparametric <- function(YMD, dataM, alfa = 0.05, minNi = 5){
     nList[[i]] <- n_ship
   }
   
-  #   n_ship <- 0
-  #   for (i in 1:(length(x_split) - 1)){
-  #     xi <- x_split[i]
-  #     n_ship[i] <- sum(datShipPro[which(datShipPro$Shipping_DT == xi), 3])
-  #   }
-  #   n_ship <- matrix(n_ship, nrow=1)
   x_mid <- sapply(1:length(x), function(i){
     tmpd <- strsplit(x[i], "/")[[1]]
     tmpd[3] <- "15"
@@ -334,8 +328,6 @@ rmaNonparametric <- function(YMD, dataM, alfa = 0.05, minNi = 5){
   for (l in 1:length(nList)){
     colnames(nList[[l]]) <- x_mid[1:(length(x_mid) - 1)]
   }
-  #   colnames(n_ship) <- x_mid[1:(length(x_mid) - 1)]
-  # It hasn't fixed yet.
   if (is.null(dataM[[6]]) == FALSE){
     for (n in 1:nrow(dataM[[6]])){
       n_ship[which(colnames(n_ship) == dataM[[6]][n, 1])] <- as.numeric(dataM[[6]][n, 3])
@@ -406,16 +398,10 @@ rmaNonparametric <- function(YMD, dataM, alfa = 0.05, minNi = 5){
           failureTable[i, 2] <- failureTable[i, 2] + nShip_censore     # ri (attr 3)
         }
       }
-      #       if (length(which(lf_nonBroken == uniTimePoint[i - 1])) > 0){
-      #         dataComp_c_part$
-      #         matchShipDT <- colnames(n_ship)[which(lf_nonBroken == uniTimePoint[i - 1])]
-      #         failureTable[i, 2] <- failureTable[i, 2] + n_ship[which(lf_nonBroken == uniTimePoint[i - 1])]
-      #       } 
       
       failureTable[i, 3] <- failureTable[i - 1, 3] - sum(failureTable[i - 1, 1] + failureTable[i - 1, 2])    # ni
     }
     
-    #     failureTable <- matrix(failureTable[-1, ], ncol = 7)
     rownames(failureTable) <- c(0, uniTimePoint)
     colnames(failureTable) <- c("di", "ri", "ni", "1-pi", "F(ti)", "Lower", "Upper")
     if (min(failureTable[, 3]) < 0){
@@ -640,10 +626,6 @@ rmaNonparametric <- function(YMD, dataM, alfa = 0.05, minNi = 5){
       #
       x <- x[-which(y == max(y))]
       y <- y[-which(y == max(y))]
-      #     if (length(x) == 1){
-      #       x <- c(0, x)
-      #       y <- c(0, y)
-      #     }
       fit <- lm(y ~ x)
       #
       # y = ax + b
@@ -703,14 +685,6 @@ rmaNonparametric <- function(YMD, dataM, alfa = 0.05, minNi = 5){
     
     estM <- sum((rev(n_ship)*probVectorM)[restrict], na.rm = T)
     EstM[num] <- estM
-    #
-    # only consider "In warranty" (use the data which less than 4 months)
-    #
-    #     timeDiff <- strptime(paste(YMD, "/01", sep = ""), "%Y/%m/%d") - strptime(colnames(n_ship), "%Y/%m/%d")
-    #     restrict <- which(timeDiff < 720)
-    
-    #     estMw <- sum(rev(n_ship)*probVectorM[restrict])
-    #     EstMw[num] <- estMw
   }
   return(list(Est, EstLower, EstUpper, EstM))
 }
@@ -732,7 +706,6 @@ selectNi <- function(dataM, YMD, maxNi = 5){
   }
   xDate <- x[1:length(x) - 1]
   
-  # ----- select mechanism
   #----- selection mechanism
   EstStorage <- list()
   for (k in 1:maxNi){
@@ -742,9 +715,6 @@ selectNi <- function(dataM, YMD, maxNi = 5){
     tmpUpper <- 0
     tmpTrendmv <- 0
     tmpEstM <- 0
-    #---
-    #     tmpWSS <- 0
-    #     tmpWSSTrend <- 0
     
     if (length(xDate) < 25){
       twoPeriod <- length(xDate)
@@ -759,21 +729,6 @@ selectNi <- function(dataM, YMD, maxNi = 5){
       tmpUpper[i] <- sum(tmpStore[[3]])
       tmpTrendmv[i] <- sum(tmpStore[[1]])
       tmpEstM[i] <- sum(tmpStore[[4]])
-      #       tmpMA[i] <- tmpStore[[1]]
-      #       #      
-      #       tmpFusion[i] <- tmpStore[[1]]
-      #       tmpZLEMA[i] <- tmpStore[[1]]
-      #       tmp2ndmv[i] <- tmpTrendmv[i] <- tmpStore[[1]]
-      #
-      #       tmpWSS[i] <- tmpStore[[1]]
-      
-      #       if (i > 5){
-      #         nBreakPart <- n_break[1:(i - 1)]
-      #         tmpZLEMA[i] <- ZLEMA(c(nBreakPart, tmpZLEMA[i]), 5)[length(tmpZLEMA)]
-      #         tmp <- ZLEMA(nBreakPart, 5)
-      #         tmpFusion[i] <- mean(c(tmp[length(tmp)], tmpStore[[1]]))
-      #         ##
-      #       }
       
       if (i > 10){
         mean1 <- mean(n_break[(i - 1):(i - 5)])
@@ -781,9 +736,6 @@ selectNi <- function(dataM, YMD, maxNi = 5){
         mean3 <- mean(n_break[(i - 3):(i - 7)])
         mean4 <- mean(n_break[(i - 4):(i - 8)])
         mean5 <- mean(n_break[(i - 5):(i - 9)])
-        #         mean2ALL <- mean(c(mean1, mean2, mean3, mean4, mean5))
-        #         a <- 2*mean1 - mean2ALL; b <- 2/(5 - 1)*(mean1  - mean2ALL)
-        #         tmp2ndmv[i] <- mean(c(a + b,  tmpStore[[1]]))
         #-------------------
         
         ft1 <- mean2 - mean1
@@ -793,67 +745,6 @@ selectNi <- function(dataM, YMD, maxNi = 5){
         ftMean <- mean(c(ft1, ft2, ft3, ft4))
         tmpTrendmv[i] <- mean(c(mean1 + ftMean,  sum(tmpStore[[1]])))
       }
-      #---
-      #       tmpWSS[i] <- tmpStore[[1]]
-      #       tmpWSSTrend[i] <- tmpStore[[1]]
-      #       if (i > 3){
-      #         nBreakPart <- n_break[1:(i - 1)]
-      #         x <- sign(diff(nBreakPart))
-      #         for (y in 1:length(x)){
-      #           tmp <- x[y]
-      #           if (tmp == -1){
-      #             x[y] <- 1 # negative
-      #           }else if(tmp == 0){
-      #             x[y] <- 2 # zero
-      #           }else{
-      #             x[y] <- 3 # positive
-      #           }
-      #         }
-      #         p <- matrix(nrow = 3, ncol = 3, 0)
-      #         for (t in 1:(length(x) - 1)) p[x[t], x[t + 1]] <- p[x[t], x[t + 1]] + 1
-      #         for (j in 1:3) {
-      #           if (sum(p[j, ]) != 0)
-      #             p[j, ] <- p[j, ] / sum(p[j, ])
-      #         }
-      #         if (x[length(x)] == 1){
-      #           initial <- c(1, 0, 0)
-      #         }else if(x[length(x)] == 2){
-      #           initial <- c(0, 1, 0)
-      #         }else{
-      #           initial <- c(0, 0, 1)
-      #         }
-      #         
-      #         pState <- initial%*%p
-      #         
-      #         historyData <- nBreakPart - mean(nBreakPart)
-      #         rP <- round(pState, 3)
-      #         neg <- sample(historyData[which(historyData < 0)], 1000*rP[1, 1], replace = T)
-      #         zero <- sample(0, 1000*rP[1, 2], replace = T)
-      #         pos <- sample(historyData[which(historyData > 0)], 1000*rP[1, 3], replace = T)
-      #         preWss <- mean(nBreakPart) + sum(c(neg, zero, pos))/1000
-      #         tmpWSS[i] <- mean(c(tmpStore[[1]], preWss))
-      #         #         tmpWSS[i] <- tmpStore[[1]] + sum(c(neg, zero, pos))/1000
-      #         #         tmpWSS[i] <- preWss
-      #         tmpWSSTrend[i] <- mean(c(tmpTrendmv[i], preWss))
-      #       }
-      #------
-      #       nBreakPart <- n_break[1:(i - 1)]
-      #       meanWithoutZero <- mean(nBreakPart[which(nBreakPart != 0)])
-      #       meanN_break <- mean(nBreakPart)
-      #       meanUP <- which(nBreakPart >= meanN_break)
-      #       meanDown <- which(nBreakPart < meanN_break)
-      #       probUP <- length(meanUP)/length(nBreakPart)
-      #       meanN_breakUP <- mean(n_break[meanUP])
-      #       meanN_breakDown <- mean(n_break[meanDown])
-      #       if (length(meanUP) > 1){
-      #         intervalMean <- mean(diff(meanUP))
-      #       }else{
-      #         intervalMean <- 0.5
-      #       }
-      #       
-      #       pro <- (tmpCrost[i] - meanN_break)/intervalMean # 多備或少備料的個數
-      #       
-      #       tmpCrost[i] <- tmpCrost[i] + pro
       
     }
     if (length(xDate) > 24){
@@ -862,122 +753,26 @@ selectNi <- function(dataM, YMD, maxNi = 5){
         tmpEst[i] <- sum(tmpStore[[1]])
         tmpEstM[i] <- sum(tmpStore[[4]])
         
-        #         nBreakPart <- c(n_break[1:(i - 1)], tmpStore[[1]])
-        #         tmpEnd <- as.numeric(c(strsplit(xDate[i], "/")[[1]]))
-        #         nBreakPartts <- ts(nBreakPart, 
-        #                            start=c(dataM[[1]][1], dataM[[1]][2]), end=c(tmpEnd[1], tmpEnd[2]), frequency = 12)
-        #         fit <- stl(nBreakPartts, s.window="period")
-        #         plot(fit)
-        #         seasonal <- as.numeric(fit$time.series[, 1])
-        #         trend <- as.numeric(fit$time.series[, 2])
-        
-        #         tmpStore <- rmaNonparametric(xDate[i], dataM, minNi = k)
-        #         tmpEst[i] <- tmpStore[[1]]
-        #         tmpEstLoess[i] <- tmpStore[[1]] + seasonal[i]
         tmpLower[i] <- sum(tmpStore[[2]])
         tmpUpper[i] <- sum(tmpStore[[3]])
-        #         tmpLowerLoess[i] <- tmpStore[[2]] + seasonal[i]
-        #         tmpUpperLoess[i] <- tmpStore[[3]] + seasonal[i]
-        #         tmpMA[i] <- mean(c(tmpStore[[1]], n_break[(i - 1):(i - 12)]))
-        #         tmpMA[i] <- sum(c(tmpStore[[1]]*12, n_break[(i - 1):(i - 11)]*c(11:1)))/sum(1:12)
-        #         tmpMAts[i] <- tmpMA[i] + seasonal[i]
-        #         tmpTrend[i] <- trend[i]
-        #         tmpTrendSeason[i] <- trend[i] + seasonal[i]
-        #         tmpZLEMA[i] <- tmpStore[[1]]
-        #         tmpZLEMA[i] <- ZLEMA(tmpZLEMA, 5)[length(tmpZLEMA)]
-        #         nBreakPart <- n_break[1:(i - 1)]
-        #         tmpZLEMA[i] <- ZLEMA(c(nBreakPart, tmpZLEMA[i]), 12)[length(tmpZLEMA)]
-        
-        #         tmp <- ZLEMA(nBreakPart, 5)
-        #         tmpFusion[i] <- mean(c(tmp[length(tmp)], tmpStore[[1]]))
         
         #-----
-        #         tmp2ndmv[i] <- 
         tmpTrendmv[i] <- sum(tmpStore[[1]])
         mean1 <- mean(n_break[(i - 1):(i - 5)])
         mean2 <- mean(n_break[(i - 2):(i - 6)])
         mean3 <- mean(n_break[(i - 3):(i - 7)])
         mean4 <- mean(n_break[(i - 4):(i - 8)])
         mean5 <- mean(n_break[(i - 5):(i - 9)])
-        #         mean2ALL <- mean(c(mean1, mean2, mean3, mean4, mean5))
-        #         a <- 2*mean1 - mean2ALL; b <- 2/(5 - 1)*(mean1  - mean2ALL)
-        #         tmp2ndmv[i] <- mean(c(a + b,  tmpStore[[1]]))
-        #         #-----
+
         ft1 <- mean2 - mean1
         ft2 <- mean3 - mean2
         ft3 <- mean4 - mean3
         ft4 <- mean5 - mean4
         ftMean <- mean(c(ft1, ft2, ft3, ft4))
         tmpTrendmv[i] <- mean(c(mean1 + ftMean,  sum(tmpStore[[1]])))
-        #         
-        #         #------
-        #         #---
-        #         
-        #         nBreakPart <- n_break[1:(i - 1)]
-        #         x <- sign(diff(nBreakPart))
-        #         for (y in 1:length(x)){
-        #           tmp <- x[y]
-        #           if (tmp == -1){
-        #             x[y] <- 1 # negative
-        #           }else if(tmp == 0){
-        #             x[y] <- 2 # zero
-        #           }else{
-        #             x[y] <- 3 # positive
-        #           }
-        #         }
-        #         p <- matrix(nrow = 3, ncol = 3, 0)
-        #         for (t in 1:(length(x) - 1)) p[x[t], x[t + 1]] <- p[x[t], x[t + 1]] + 1
-        #         for (j in 1:3) {
-        #           if (sum(p[j, ]) != 0)
-        #             p[j, ] <- p[j, ] / sum(p[j, ])
-        #         }
-        #         
-        #         if (x[length(x)] == 1){
-        #           initial <- c(1, 0, 0)
-        #         }else if(x[length(x)] == 2){
-        #           initial <- c(0, 1, 0)
-        #         }else{
-        #           initial <- c(0, 0, 1)
-        #         }
-        #         
-        #         pState <- initial%*%p
-        #         
-        #         historyData <- nBreakPart - mean(nBreakPart)
-        #         rP <- round(pState, 3)
-        #         neg <- sample(historyData[which(historyData < 0)], 1000*rP[1, 1], replace = T)
-        #         zero <- sample(0, 1000*rP[1, 2], replace = T)
-        #         pos <- sample(historyData[which(historyData > 0)], 1000*rP[1, 3], replace = T)
-        #         preWss <- mean(nBreakPart) + sum(c(neg, zero, pos))/1000
-        #         tmpWSS[i] <- mean(c(tmpStore[[1]], preWss))
-        #         tmpWSS[i] <- tmpStore[[1]] + sum(c(neg, zero, pos))/1000
-        #         tmpWSS[i] <- preWss
-        
-        #         tmpWSSTrend[i] <- mean(c(tmpTrendmv[i], preWss))
-        #         tmpWSS[i] <- tmpStore[[1]] + preWss
-        #         nBreakPart <- n_break[1:(i - 1)]
-        #         #       meanWithoutZero <- mean(nBreakPart[which(nBreakPart != 0)])
-        #         meanN_break <- mean(nBreakPart)
-        #         meanUP <- which(nBreakPart >= meanN_break)
-        #         meanDown <- which(nBreakPart < meanN_break)
-        #         probUP <- length(meanUP)/length(nBreakPart)
-        #         meanN_breakUP <- mean(n_break[meanUP])
-        #         meanN_breakDown <- mean(n_break[meanDown])
-        #         if (length(meanUP) > 1){
-        #           intervalMean <- mean(diff(meanUP))
-        #         }else{
-        #           intervalMean <- 1
-        #         }
-        #         
-        #         pro <- (tmpCrost[i] - meanN_break)/intervalMean # 多備或少備料的個數
-        #         
-        #         tmpCrost[i] <- tmpCrost[i] + pro
       }
     }
     
-    #     EstStorage[[k]] <- matrix(c(tmpEst, tmpLower, tmpUpper, 
-    #                                 tmpMA, tmpZLEMA, tmpFusion, 
-    #                                 tmp2ndmv, tmpTrendmv, 
-    #                                 tmpWSS, tmpWSSTrend), ncol = 10)
     EstStorage[[k]] <- matrix(c(tmpEst, tmpLower, tmpUpper, tmpTrendmv, tmpEstM), ncol = 5)
   }
   
@@ -990,9 +785,6 @@ selectNi <- function(dataM, YMD, maxNi = 5){
   Est <- EstStorage[[minNi]][, 1]
   Lower <- EstStorage[[minNi]][, 2]
   Upper <- EstStorage[[minNi]][, 3]
-  #   EstLoess <- EstStorage[[minNi]][, 4]
-  #   LowerLoess <- EstStorage[[minNi]][, 5]
-  #   UpperLoess <- EstStorage[[minNi]][, 6]
   nb <- c(as.numeric(n_break))
   #----
   MVTrend <- EstStorage[[minNi]][, 4]
@@ -1002,9 +794,7 @@ selectNi <- function(dataM, YMD, maxNi = 5){
                           MVTrend = MVTrend, EstModified = EstModified, Empirical = dataM[[7]])
   ## use time series to let the estimation close to the truth.
   ## 暫時先在這裡算，但其實應該是要在迴圈裏面計算考慮nb time series。  
-  #   ind1 <- (which(dataFrame[, "nb"] != 0))
-  #   ind2 <- (which(dataFrame[, "EstModified"] != 0))
-  #   ind <- min(ind1[16], ind2[16])
+  ## ind is set as 30, because the frequency in time series is set as 12, it need at least 2 period.
   ind <- 30
   est.ts <- rep(0, nrow(dataFrame))
   est.ts[1:(ind - 1)] <- dataFrame[1:(ind - 1), "EstModified"]
@@ -1018,10 +808,7 @@ selectNi <- function(dataM, YMD, maxNi = 5){
     estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
     fitE <- stl(estTS, s.window="period")  
     diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
-    dValue <- mean(diffValue[(length(diffValue) - 10):length(diffValue)])
-    #     updown <- tmpTab[, "EstModified"] - fitE$time.series[, 2]
-    #     timeline <- fitB$time.series[, "trend"] + updown
-    #     est.ts[r] <- timeline[length(timeline)]
+    dValue <- mean(diffValue[(length(diffValue) - 5):length(diffValue)])
     est.ts[r] <- dataFrame[r, "EstModified"] - dValue
   }
   dataFrame <- cbind(dataFrame, EstTs = est.ts)
@@ -1059,9 +846,7 @@ MAValue <- 0
 MVTrendValue <- 0
 EstModified <- 0
 Differnce <- list()
-# NeedMaxNi <- c(18)
 for (i in 1:length(pN)){
-  # for (i in NeedMaxNi){
   ymd <- "2014/12" # input 1
   # productName = "ARK-3360L-N4A1E" # input 2
   #   productName = pN[i]
