@@ -9,10 +9,10 @@ dat_all <- sqlQuery(conn, "SELECT Product_Name, Order_DT, Barcode, Warranty_DT, 
                     FROM [SBA].[dbo].[eRMA_All]")
 
 dat_com <- sqlQuery(conn, "SELECT [Order_No]
-                    ,[Item_No]
-                    ,[PartNumber]
-                    ,[Qty]
-                    FROM [SBA].[dbo].[eRMA_Consumption_All]")
+                                 ,[Item_No]
+                                 ,[PartNumber]
+                                 ,[Qty]
+                            FROM [SBA].[dbo].[eRMA_Consumption_All]")
 
 dat_shipping <- sqlQuery(conn, "SELECT [Shipping_DT], [Product_Name], [Qty], [Model_No]
                          FROM [SBA].[dbo].[EAI_Shipping]
@@ -228,7 +228,7 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
     tc1 <- as.numeric(strptime(time1, "%Y/%m/%d"))
     tc2 <- as.numeric(strptime(time2, "%Y/%m/%d"))
     tmp <- which(tc1 <= as.numeric(strptime(dat$Receive_DT, "%Y/%m/%d")) & 
-                   as.numeric(strptime(dat$Receive_DT, "%Y/%m/%d")) < tc2)
+                        as.numeric(strptime(dat$Receive_DT, "%Y/%m/%d")) < tc2)
     n <- sum(dat[tmp, "qty"])
     return(n)
   }
@@ -694,7 +694,7 @@ rmaNonparametric <- function(YMD, dataM, alfa = 0.05, minNi = 5){
     est <- sum((rev(n_ship) * probVector)[1:lenLimit], na.rm = T)
     estLower <- sum((rev(n_ship) * probVectorLower)[1:lenLimit], na.rm = T)
     estUpper <- sum((rev(n_ship) * probVectorUpper)[1:lenLimit], na.rm = T)
-    
+      
     Est[num] <- est
     EstLower[num] <- estLower
     EstUpper[num] <- estUpper
@@ -890,72 +890,72 @@ selectNi <- function(dataM, YMD, maxNi = 5){
         #         tmpZLEMA[i] <- ZLEMA(tmpZLEMA, 5)[length(tmpZLEMA)]
         #         nBreakPart <- n_break[1:(i - 1)]
         #         tmpZLEMA[i] <- ZLEMA(c(nBreakPart, tmpZLEMA[i]), 12)[length(tmpZLEMA)]
-        
+                
         #         tmp <- ZLEMA(nBreakPart, 5)
         #         tmpFusion[i] <- mean(c(tmp[length(tmp)], tmpStore[[1]]))
         
         #-----
-        #         tmp2ndmv[i] <- 
+#         tmp2ndmv[i] <- 
         tmpTrendmv[i] <- sum(tmpStore[[1]])
         mean1 <- mean(n_break[(i - 1):(i - 5)])
         mean2 <- mean(n_break[(i - 2):(i - 6)])
         mean3 <- mean(n_break[(i - 3):(i - 7)])
         mean4 <- mean(n_break[(i - 4):(i - 8)])
         mean5 <- mean(n_break[(i - 5):(i - 9)])
-        #         mean2ALL <- mean(c(mean1, mean2, mean3, mean4, mean5))
-        #         a <- 2*mean1 - mean2ALL; b <- 2/(5 - 1)*(mean1  - mean2ALL)
-        #         tmp2ndmv[i] <- mean(c(a + b,  tmpStore[[1]]))
-        #         #-----
+#         mean2ALL <- mean(c(mean1, mean2, mean3, mean4, mean5))
+#         a <- 2*mean1 - mean2ALL; b <- 2/(5 - 1)*(mean1  - mean2ALL)
+#         tmp2ndmv[i] <- mean(c(a + b,  tmpStore[[1]]))
+#         #-----
         ft1 <- mean2 - mean1
         ft2 <- mean3 - mean2
         ft3 <- mean4 - mean3
         ft4 <- mean5 - mean4
         ftMean <- mean(c(ft1, ft2, ft3, ft4))
         tmpTrendmv[i] <- mean(c(mean1 + ftMean,  sum(tmpStore[[1]])))
-        #         
-        #         #------
-        #         #---
-        #         
-        #         nBreakPart <- n_break[1:(i - 1)]
-        #         x <- sign(diff(nBreakPart))
-        #         for (y in 1:length(x)){
-        #           tmp <- x[y]
-        #           if (tmp == -1){
-        #             x[y] <- 1 # negative
-        #           }else if(tmp == 0){
-        #             x[y] <- 2 # zero
-        #           }else{
-        #             x[y] <- 3 # positive
-        #           }
-        #         }
-        #         p <- matrix(nrow = 3, ncol = 3, 0)
-        #         for (t in 1:(length(x) - 1)) p[x[t], x[t + 1]] <- p[x[t], x[t + 1]] + 1
-        #         for (j in 1:3) {
-        #           if (sum(p[j, ]) != 0)
-        #             p[j, ] <- p[j, ] / sum(p[j, ])
-        #         }
-        #         
-        #         if (x[length(x)] == 1){
-        #           initial <- c(1, 0, 0)
-        #         }else if(x[length(x)] == 2){
-        #           initial <- c(0, 1, 0)
-        #         }else{
-        #           initial <- c(0, 0, 1)
-        #         }
-        #         
-        #         pState <- initial%*%p
-        #         
-        #         historyData <- nBreakPart - mean(nBreakPart)
-        #         rP <- round(pState, 3)
-        #         neg <- sample(historyData[which(historyData < 0)], 1000*rP[1, 1], replace = T)
-        #         zero <- sample(0, 1000*rP[1, 2], replace = T)
-        #         pos <- sample(historyData[which(historyData > 0)], 1000*rP[1, 3], replace = T)
-        #         preWss <- mean(nBreakPart) + sum(c(neg, zero, pos))/1000
-        #         tmpWSS[i] <- mean(c(tmpStore[[1]], preWss))
+#         
+#         #------
+#         #---
+#         
+#         nBreakPart <- n_break[1:(i - 1)]
+#         x <- sign(diff(nBreakPart))
+#         for (y in 1:length(x)){
+#           tmp <- x[y]
+#           if (tmp == -1){
+#             x[y] <- 1 # negative
+#           }else if(tmp == 0){
+#             x[y] <- 2 # zero
+#           }else{
+#             x[y] <- 3 # positive
+#           }
+#         }
+#         p <- matrix(nrow = 3, ncol = 3, 0)
+#         for (t in 1:(length(x) - 1)) p[x[t], x[t + 1]] <- p[x[t], x[t + 1]] + 1
+#         for (j in 1:3) {
+#           if (sum(p[j, ]) != 0)
+#             p[j, ] <- p[j, ] / sum(p[j, ])
+#         }
+#         
+#         if (x[length(x)] == 1){
+#           initial <- c(1, 0, 0)
+#         }else if(x[length(x)] == 2){
+#           initial <- c(0, 1, 0)
+#         }else{
+#           initial <- c(0, 0, 1)
+#         }
+#         
+#         pState <- initial%*%p
+#         
+#         historyData <- nBreakPart - mean(nBreakPart)
+#         rP <- round(pState, 3)
+#         neg <- sample(historyData[which(historyData < 0)], 1000*rP[1, 1], replace = T)
+#         zero <- sample(0, 1000*rP[1, 2], replace = T)
+#         pos <- sample(historyData[which(historyData > 0)], 1000*rP[1, 3], replace = T)
+#         preWss <- mean(nBreakPart) + sum(c(neg, zero, pos))/1000
+#         tmpWSS[i] <- mean(c(tmpStore[[1]], preWss))
         #         tmpWSS[i] <- tmpStore[[1]] + sum(c(neg, zero, pos))/1000
         #         tmpWSS[i] <- preWss
         
-        #         tmpWSSTrend[i] <- mean(c(tmpTrendmv[i], preWss))
+#         tmpWSSTrend[i] <- mean(c(tmpTrendmv[i], preWss))
         #         tmpWSS[i] <- tmpStore[[1]] + preWss
         #         nBreakPart <- n_break[1:(i - 1)]
         #         #       meanWithoutZero <- mean(nBreakPart[which(nBreakPart != 0)])
@@ -976,7 +976,7 @@ selectNi <- function(dataM, YMD, maxNi = 5){
         #         tmpCrost[i] <- tmpCrost[i] + pro
       }
     }
-    
+
     #     EstStorage[[k]] <- matrix(c(tmpEst, tmpLower, tmpUpper, 
     #                                 tmpMA, tmpZLEMA, tmpFusion, 
     #                                 tmp2ndmv, tmpTrendmv, 
@@ -986,7 +986,7 @@ selectNi <- function(dataM, YMD, maxNi = 5){
   
   output <- lapply(1:maxNi, function(k){
     sum((EstStorage[[k]][-(length(EstStorage[[k]][, 1])), 1] - as.numeric((c(0, n_break))[1:(length(xDate) - 1)]))^2)
-  })
+    })
   
   minNi <- min(which(unlist(output) == min(unlist(output))))
   # -----
@@ -1000,7 +1000,7 @@ selectNi <- function(dataM, YMD, maxNi = 5){
   #----
   MVTrend <- EstStorage[[minNi]][, 4]
   EstModified <- EstStorage[[minNi]][, 5]
-  
+
   dataFrame <- data.frame(x = xDate, nb = nb, Est=Est, Lower = Lower, Upper = Upper, 
                           MVTrend = MVTrend, EstModified = EstModified, Empirical = dataM[[7]])
   ## use time series to let the estimation close to the truth.
@@ -1101,7 +1101,7 @@ for (i in 1:length(pN)){
   dataM <- dataArr(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = NULL, componentName = componentName, YMD = ymd)
   elected <- selectNi(dataM = dataM, YMD = ymd, maxNi = 1)
   
-  #   par(mfrow = c(2, 1))
+    #   par(mfrow = c(2, 1))
   plot(1:nrow(elected), elected[, "nb"], 
        xlab = "Date", ylab = "Amount", main = componentName,
        pch = 16, type = "b", lty = 2, 
