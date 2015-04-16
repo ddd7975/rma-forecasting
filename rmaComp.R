@@ -343,23 +343,26 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
   for (num in 1:length(uniqueProduct)){
     n_ship <- nList[[num]]
     proName <- uniqueProduct[num]
-    #
-    # for caculate censored 
-    #
+    ##
+    ## for caculate censored 
+    ##
     lf_nonBroken <- as.numeric(strptime(endMonth, "%Y-%m-%d") - strptime(as.character(colnames(n_ship)), "%Y/%m/%d"))
     dat_attr3 <- as.data.frame(cbind(lifeTime = lf_nonBroken, attribute = rep("3", length(lf_nonBroken))))
-    #
-    # ---- dataComp_c includes all the data, it need to remove the Receive_DT after YMD.
-    #
+    ##
+    ## ---- dataComp_c includes all the data, it need to remove the Receive_DT after YMD.
+    ##
     dataComp_c_pro <- dataComp_c[which(dataComp_c$Product_Name == proName), ]
     part <- which(strptime(endMonth, "%Y-%m-%d") - strptime(dataComp_c_pro$Receive_DT, "%Y/%m/%d") > 0)
     dataComp_c_part <- dataComp_c_pro[part, ]
     dat_attr1 <- as.data.frame(cbind(lifeTime = dataComp_c_part$lifeTime, attribute = rep("1", length(dataComp_c_part$lifeTime))))
-    # ----
+    ##
+    ##
     censoredPro <- dat_censored1[which(dat_censored1$Product_Name == proName), ]
     if (nrow(censoredPro) != 0){
       lf_censored1 <- strptime(rep(YMD, nrow(censoredPro)), "%Y/%m/%d") - strptime(censoredPro$MES_Shipping_Dt_withDay, "%Y/%m/%d")
-      # ---- Because lf_censored1 is build before input the YMD, so it may include the shipping date after than the YMD, so the value will be negative.
+      ##
+      ## ---- Because lf_censored1 is build before input the YMD, so it may include the shipping date after than the YMD, so the value will be negative.
+      ##
       lf_censored1_part <- lf_censored1[which(lf_censored1 > 0)]
       dat_attr2 <- as.data.frame(cbind(lifeTime = as.numeric(lf_censored1_part), attribute = rep("2", length(lf_censored1_part))))
     }else{
@@ -370,15 +373,15 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     tmpTableOrder <- tmpTable[order(tmpTable[, 1]), ]
     ind <- which(strptime(colnames(n_ship), "%Y/%m/%d") < strptime(endMonth, "%Y-%m-%d"))
     n <- sum(n_ship[ind])
-    #
-    # ----- combine the same lifeTime and same attribute together
-    #
+    ##
+    ## ----- combine the same lifeTime and same attribute together
+    ##
     uniTimePoint <- unique(tmpTableOrder[, 1])  
     failureTable <- matrix(0, ncol = 7, nrow = (length(uniTimePoint) + 1))
     failureTable[1, 3] <- n
     
     for (i in 2:(length(uniTimePoint) + 1)){
-      print(i/(length(uniTimePoint) + 1))
+      #       print(i/(length(uniTimePoint) + 1))
       tab <- tmpTableOrder[which(tmpTableOrder[, 1] == uniTimePoint[i - 1]), ]
       failureTable[i, 1] <- sum((tab[, 2] == 1))      # di
       failureTable[i, 2] <- sum((tab[, 2] == 2))      # ri
@@ -460,16 +463,12 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
         }
       }
       
-      # -----
-      #
-      # failureTable has only one di, so the F(ti) will be the same, it will let the prob all be zero.
-      #
+      ##
+      ## failureTable has only one di, so the F(ti) will be the same, it will let the prob all be zero.
+      ##
       for (j in 5:7){
         if (failureTable[1, 1] == 0){
           if (length(which(failureTable[, j] > 0)) > 0){
-            #             for (i in 2:which(failureTable[, j] > 0)[1]){
-            #               failureTable[i, j] <- failureTable[which(failureTable[, j] > 0)[1], ][j]
-            #             }
             for (r in 2:(min(lastDiLargeN) - 1)){
               proportion <- c(0, uniTimePoint)[r]/(c(0, uniTimePoint)[min(lastDiLargeN)])
               failureTable[r, 5] <- proportion*failureTable[min(lastDiLargeN), 5]
@@ -478,17 +477,18 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
         }
       }
     }
-    # ----- Start to build the process of calculation 
-    # unit: day
-    # Add the currently ()
+    ## ----- Start to build the process of calculation 
+    ## unit: day
+    ## Add the currently ()
     timePoint <- rev(c(strptime(endMonth, "%Y-%m-%d") - strptime(colnames(n_ship), "%Y/%m/%d"), 0))
-    # probMapping is a function that can map a given timeRange(tpIni, tpEnd) to failureTable to get the probability.
+    ##
+    ## probMapping is a function that can map a given timeRange(tpIni, tpEnd) to failureTable to get the probability.
+    ##
     probMapping <- function(tpIni, tpEnd, index, ftab){
       if (tpIni %in% uniTimePoint & tpEnd %in% uniTimePoint){
         row1 <- ftab[which(uniTimePoint == tpIni), ]
         row2 <- ftab[which(uniTimePoint == tpEnd), ]
         f1 <- row1[index]; f2 <- row2[index]
-        
         if (f1 == 0){
           iniRow1 <- iniRow2 <- which(uniTimePoint == tpIni)
           while(ftab[iniRow1, index] == 0){
@@ -519,7 +519,6 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
         
         prob <- f2 - f1
       }else{
-        # 暫時處理
         if (length(which(uniTimePoint <= tpIni)) == 0){
           iniNear1 <- min(uniTimePoint)
         }else{
@@ -564,11 +563,8 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
         }else{
           proportion <- (tpIni - iniNear1)/(iniNear2 - iniNear1)
         }
-        
-        
         prob_tpIni <- f11 + proportion*(f12 - f11)
         # -----
-        
         
         if (length(which(uniTimePoint <= tpIni)) == 0){
           endNear1 <- min(uniTimePoint)
@@ -628,7 +624,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
       y <- y[-which(y == max(y))]
       fit <- lm(y ~ x)
       #
-      # y = ax + b
+      # model:y = ax + b
       #
       a <- fit$coefficients[2]; b <- fit$coefficients[1]
       #
@@ -798,7 +794,7 @@ selectNi <- function(dataM, YMD, maxNi = 5){
   est.ts <- rep(0, nrow(dataFrame))
   est.ts[1:(ind - 1)] <- dataFrame[1:(ind - 1), "EstModified"]
   for (r in ind:nrow(dataFrame)){
-    print(r/nrow(dataFrame))
+    #     print(r/nrow(dataFrame))
     tmpTab <- dataFrame[1:(r - 1), ]
     endD <- as.character(tmpTab[(r - 1), 1])
     enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
@@ -849,7 +845,6 @@ EstModified <- 0
 Differnce <- list()
 for (i in 1:length(pN)){
   ymd <- "2014/12" # input 1
-  # productName = "ARK-3360L-N4A1E" # input 2
   #   productName = pN[i]
   #   componentName <- "1254000882"
   #   componentName <- "96FMCFI-1G-CT-SS1"
@@ -929,10 +924,6 @@ for (i in 1:length(pN)){
   EstTs[i] <- sum((as.numeric(elected[, "EstTs"]) - as.numeric(elected[, "nb"]))^2)
 }
 
-for (i in 1:length(Differnce)){
-  path <- "C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\CompareWithEmpirical\\Diff\\output\\"
-  write.csv(Differnce[[i]], paste(c(path, pN[i], ".csv"), collapse = ""))
-}
 
 tab <- data.frame(Empirical = round(EmpiricalValue, 3), 
                   Nonparametric = round(NonparametricValue, 3),
