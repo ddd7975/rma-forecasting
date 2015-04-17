@@ -256,7 +256,6 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   
   for (i in 1:(length(x) - 1)){
     print(i/(length(x) - 1))
-    #     n_break[i] <- CountReturn(x[i], x[i + 1], dataComp_c)
     n_break[i] <- CountReturn(x[i], x[i + 1], dataOFW)
   }
   n_break <- matrix(n_break, nrow=1)
