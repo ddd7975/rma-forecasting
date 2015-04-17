@@ -803,7 +803,7 @@ selectNi <- function(dataM, YMD, maxNi = 5){
     estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
     fitE <- stl(estTS, s.window="period")  
     diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
-    dValue <- mean(diffValue[(length(diffValue) - 5):length(diffValue)])
+    dValue <- mean(diffValue[(length(diffValue) - 4):length(diffValue)])
     est.ts[r] <- dataFrame[r, "EstModified"] - dValue
   }
   neg <- which(est.ts < 0)
@@ -937,35 +937,6 @@ tab <- cbind(tab, mini)
 rownames(tab) <- pN
 write.csv(tab, "C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\CompareWithEmpirical\\DistanceCompareV2.csv")
 
-
-pN <- c(
-  "PCA-6006LV-00B2E", # mine
-  "TREK5501102E-T", # mine
-  "TREK5501115E-T", # mine #maxNi < 10
-  "TREK5501110E-T", # mine
-  "TREK-550-LIBAN-01E", # mine   #maxNi
-  "TREK-550-LG-00E" , # mine
-  "TREK-303R-HA0E", # mine
-  "POC-170COCKPITR20E", # mine
-  "POD-CB08-00A1E", # mine 
-  "DSM-9300-N1E", # mine
-  "USB-4716-AE", # mine
-  "PCI-1711U-CE", # mine
-  "KBD-6312-BLK", # mine
-  "96D2-1G667NN-TRL", # Empirical #maxNi
-  "UNO-2182-D13BE", #mine
-  "IPC-610P4R-30HCE", # mine
-  "ARK-3360L-N4A1E",  # mine #maxNi < 20
-  "ADAM-4520-D2",  # maxNi > 5
-  "C-ARR01-PPCL127-03", # too small, bad
-  "TPC-1261H-A1E",
-  "ARK-3440F-U4A1E", 
-  "AIMB-742VE-00A2E"
-)
-
-"MPC6-BTO" #error
-"PCM-9582F-M0A2E"  #error
-"LCDR-WT01-001Y" #error
 
 
 #remove train data
