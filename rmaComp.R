@@ -943,7 +943,7 @@ write.csv(tab, "C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProje
 
 
 #remove train data
-p <- 0.55
+p <- 0.45
 trainMonth <- round(nrow(elected)*p)
 sum(elected$nb[1:trainMonth])/sum(elected$nb)
 
@@ -951,6 +951,7 @@ sum((as.numeric(elected[1:trainMonth, "Empirical"]) - as.numeric(elected[1:train
 sum((as.numeric(elected[1:trainMonth, "Est"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
 sum((as.numeric(elected[1:trainMonth, "MVTrend"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
 sum((as.numeric(elected[1:trainMonth, "EstModified"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
+sum((as.numeric(elected[1:trainMonth, "EstTs"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
 
 testNb <- elected$nb[trainMonth:nrow(elected)]
 
@@ -958,33 +959,40 @@ testNon <- elected$Est[trainMonth:nrow(elected)]
 testEmp <- elected$Empirical[trainMonth:nrow(elected)]
 testMVTrend <- elected$MVTrend[trainMonth:nrow(elected)]
 testModified <- elected$EstModified[trainMonth:nrow(elected)]
+testTs <- elected$EstTs[trainMonth:nrow(elected)]
 cumNon <- cumsum(testNon - testNb)
 cumEmp <- cumsum(testEmp - testNb)
 cumMVTrend <- cumsum(testMVTrend - testNb)
 cumModified <- cumsum(testModified - testNb)
+cumTs <- cumsum(testTs - testNb)
 
 
 plot(1:nrow(elected), rep(0, nrow(elected)), type = "l", 
-     ylim = c(min(cumNon, cumEmp, cumMVTrend), max(cumNon, cumEmp, cumMVTrend)), 
+     ylim = c(min(cumNon, cumEmp, cumMVTrend, cumModified, cumTs), max(cumNon, cumEmp, cumMVTrend, cumModified, cumTs)), 
      xlab = "Date", ylab = "cumulated difference", 
      main = componentName)
 lines(trainMonth:nrow(elected), cumNon, col = "red")
 lines(trainMonth:nrow(elected), cumEmp, col = "blue")
 lines(trainMonth:nrow(elected), cumMVTrend, col = "darkolivegreen")
 lines(trainMonth:nrow(elected), cumModified, col = "darkgoldenrod")
+lines(trainMonth:nrow(elected), cumTs, col = "purple")
 
 # 當月餘料
 remainNon <- elected$Est - elected$nb
 remainEmp <- elected$Empirical - elected$nb
 remainMVTrend <- elected$MVTrend - elected$nb
+remainMod <- elected$EstModified - elected$nb
+remainTs <- elected$EstTs - elected$nb
 
 plot(1:length(remainNon), rep(0, length(remainNon)), type = "l", 
-     ylim = c(min(c(remainEmp, remainMVTrend, remainNon)), max(c(remainEmp, remainMVTrend, remainNon))), 
+     ylim = c(min(c(remainEmp, remainMVTrend, remainNon, remainMod, remainTs)), max(c(remainEmp, remainMVTrend, remainNon, remainMod, remainTs))), 
      xlab = "Date", ylab = "remaining", 
      main = "1410022431")
 lines(1:length(remainNon), remainNon, col = "red")
 lines(1:length(remainNon), remainEmp, col = "blue", lwd = 1)
 lines(1:length(remainNon), remainMVTrend, col = "darkolivegreen", lwd = 1)
+lines(1:length(remainNon), remainMod, col = "darkgoldenrod", lwd = 1)
+lines(1:length(remainNon), remainTs, col = "purple", lwd = 1)
 
 var(remainEmp)
 var(remainMVTrend)
