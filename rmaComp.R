@@ -288,8 +288,11 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
   n_break <- dataM[[5]]
   
   endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
+  #   endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[1]
   x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
                          as.Date(endMonth), "months"))
+  
+  
   x <- as.character(sapply(x1, function(y){
     tmp <- strsplit(y, "-")[[1]]
     tmp[3] <- "01"
@@ -352,7 +355,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     ## ---- dataComp_c includes all the data, it need to remove the Receive_DT after YMD.
     ##
     dataComp_c_pro <- dataComp_c[which(dataComp_c$Product_Name == proName), ]
-    part <- which(strptime(endMonth, "%Y-%m-%d") - strptime(dataComp_c_pro$Receive_DT, "%Y/%m/%d") > 0)
+    part <- which(strptime(x[length(x)], "%Y/%m/%d") - strptime(dataComp_c_pro$Receive_DT, "%Y/%m/%d") > 0)
     dataComp_c_part <- dataComp_c_pro[part, ]
     dat_attr1 <- as.data.frame(cbind(lifeTime = dataComp_c_part$lifeTime, attribute = rep("1", length(dataComp_c_part$lifeTime))))
     ##
