@@ -680,7 +680,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     # failure rate modified
     #
     timeDiff <- strptime(paste(YMD, "/01", sep = ""), "%Y/%m/%d") - strptime(rev(colnames(n_ship)), "%Y/%m/%d")
-    restrict <- which(timeDiff < 1000)
+    restrict <- which(timeDiff < 720)
     
     estM <- sum((rev(n_ship)*probVectorM)[restrict], na.rm = T)
     EstM[num] <- estM
