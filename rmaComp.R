@@ -243,7 +243,6 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
   n_break <- dataM[[5]]
   
   endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
-  #   endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[1]
   x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
                          as.Date(endMonth), "months"))
   
@@ -265,7 +264,6 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
   uniqueProduct <- as.character(unique(datShipPro$Product_Name))
   nList <- list()
   for (i in 1:length(uniqueProduct)){
-    print(i/length(uniqueProduct))
     proName <- uniqueProduct[i]
     datShipPro_i <- datShipPro[which(datShipPro$Product_Name == proName), ]
     n_ship <- 0
@@ -803,16 +801,6 @@ EstModified <- 0
 Differnce <- list()
 for (i in 1:length(pN)){
   ymd <- "2015/02" # input 1
-  #   productName = pN[i]
-  #   componentName <- "1254000882"
-  #   componentName <- "96FMCFI-1G-CT-SS1"
-  #   componentName <- "PCE-5124G2-00A1E"
-  #   componentName <- "AIMB-742VE-00A2E"
-  #   componentName <- "96HD160G-I-SG7K3" # non performance bad
-  #   componentName <- "14S4860600" # time consuming
-  #   componentName <- "1330000985"
-  #   componentName <- "96DR-512M400NN-TR"
-  #   unique(dat_com$PartNumber)[100:200]
   componentName <- "1400000907"
   componentName <- "1400004141"
   componentName <- "1410022431"
