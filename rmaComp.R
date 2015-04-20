@@ -219,6 +219,8 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   futureShipProIndex <- which(dat_future_shipping$Product_Name %in% compBelongProduct)
   if (length(futureShipProIndex) != 0){
     datShipPro <- rbind(datShipProBefore, dat_future_shipping[futureShipProIndex, ])
+  }else{
+    datShipPro <- datShipProBefore
   }
   
   #---- method 2: moving average
