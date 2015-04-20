@@ -11,9 +11,9 @@ dat_com <- sqlQuery(conn, "SELECT [Order_No]
                     ,[Qty]
                     FROM [SBA].[dbo].[eRMA_Consumption_All]")
 
-dat_shipping <- sqlQuery(conn, "SELECT [Shipping_DT], [Product_Name], [Qty], [Model_No]
-                         FROM [SBA].[dbo].[EAI_Shipping]
-                         ")
+dat_shipping <- sqlQuery(conn, "SELECT [Shipping_DT], [Product_Name], [Qty]
+                         FROM [SBA].[dbo].[EAI_Shipping]")
+
 # save(dat_all, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
 # save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
 # # save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/David79.Tseng/advantechProject/RMA/dat_com.RData")
@@ -25,13 +25,13 @@ load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_shipping.RData")
 
 # ----- prediction of future (by month)
 dat_future_shipping <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\futureNshippingTest.csv", 
-                                header = FALSE)
+                                header = TRUE)
 colnames(dat_future_shipping) <- c("Shipping_DT", "Product_Name", "Qty")
 # ------------------------------
 # ------------------------------
 # ------------------------------
 # ----- Data Arrangement
-dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = NULL, componentName = componentName, YMD = YMD){
+dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = YMD){
   dat_com_i <- dat_com[which(dat_com$PartNumber == componentName), ] # decide a part number
   qty <- as.character(dat_com_i$Qty) 
   qty[which(qty == "")] <- 1 # if qty is blank, change it to 1
@@ -103,55 +103,6 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   belongQty <- as.numeric(belongQty)
   dataComp <- cbind(dat_all_i[which(!is.na(belongQty)), ], qty = belongQty[!is.na(belongQty)], warrantyType = warranty_Type[!is.na(belongQty)])
   
-  dat_future_shipping_pro <- NULL
-  #   if (is.null(dat_future_shipping) == FALSE){
-  #     dat_future_shipping_pro <- dat_future_shipping[which(dat_future_shipping$Product_Name == productName), ]
-  #     dat_future_shipping_pro <- as.matrix(dat_future_shipping_pro, ncol = 3)
-  #   }else{
-  #     dat_future_shipping_pro <- NULL
-  #   }
-  #   
-  #   if (is.null(dat_future_shipping) == TRUE){
-  #     dat_future_shipping_pro <- NULL
-  #   }else{
-  #     for (n in 1:nrow(dat_future_shipping_pro)){
-  #       tmp <- paste(c(as.character(dat_future_shipping_pro[n, 1]), "15"), collapse = "")
-  #       dat_future_shipping_pro[n, 1] <- paste(c(substring(tmp, first = 1, last = 4), substring(tmp, first = 5, last = 6), substring(tmp, first = 7, last = 8)), collapse = "/")
-  #     }
-  #   }
-  
-  #   dat_shipping_pro <- dat_shipping[which(dat_shipping$Product_Name == productName), ]
-  #   dat_pca <- dat_all[which(dat_all$Product_Name == productName), ]
-  #   dat_pca$Barcode <- toupper(dat_pca$Barcode)
-  #   
-  #   rdel <- which(is.na(dat_pca$MES_Shipping_DT) == T | is.na(dat_pca$Warranty_DT) == T | 
-  #                   dat_pca$MES_Shipping_DT == "" | dat_pca$Warranty_DT == "")
-  #   
-  #   if (length(rdel) != 0){dat_pca <- dat_pca[-rdel, ]} # data for use
-  
-  #   #----- Only pick the earliest receive date which the Barcode are the same.
-  #   dat_final <- matrix(0, ncol=7, nrow = 1)
-  #   colnames(dat_final) <- colnames(dat_pca)
-  #   uniBarcode <- as.character(unique(dat_pca$Barcode))
-  #   for (c in 1:length(uniBarcode)){
-  #     print(c/length(uniBarcode))
-  #     if (length(which(dat_pca$Barcode == uniBarcode[c])) == 1){
-  #       datOut <- dat_pca[which(dat_pca$Barcode == uniBarcode[c]), ]
-  #     }else{
-  #       datTmp <- dat_pca[which(dat_pca$Barcode == uniBarcode[c]), ]
-  #       chooseTime <- 0
-  #       for (d in 1:length(datTmp$Receive_DT)){
-  #         chooseTime[d] <- as.character(strptime(datTmp$Receive_DT[d], "%Y/%m/%d"))
-  #       }
-  #       if (length(which(is.na(chooseTime))) == length(chooseTime)){
-  #         datOut <- datTmp[1, ]
-  #       }else{
-  #         datOut <- datTmp[which(chooseTime == min(chooseTime, na.rm = T))[1], ]
-  #       }
-  #     }
-  #     dat_final <- rbind(dat_final, datOut)
-  #   }
-  #   dat_pca <- dat_final[-1, ]
   #############################################
   ##                                         ##
   ## 將warranty的日資料加上MES_Shipping_DT上 ##
@@ -263,7 +214,12 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   
   #-----
   compBelongProduct <- as.character(unique(dataComp_c$Product_Name))
-  datShipPro <- dat_shipping[which(dat_shipping$Product_Name %in% compBelongProduct), ]
+  datShipProBefore <- dat_shipping[which(dat_shipping$Product_Name %in% compBelongProduct), ]
+  
+  futureShipProIndex <- which(dat_future_shipping$Product_Name %in% compBelongProduct)
+  if (length(futureShipProIndex) != 0){
+    datShipPro <- rbind(datShipProBefore, dat_future_shipping[futureShipProIndex, ])
+  }
   
   #---- method 2: moving average
   estEmpirical <- 0
@@ -846,7 +802,7 @@ MVTrendValue <- 0
 EstModified <- 0
 Differnce <- list()
 for (i in 1:length(pN)){
-  ymd <- "2014/12" # input 1
+  ymd <- "2015/02" # input 1
   #   productName = pN[i]
   #   componentName <- "1254000882"
   #   componentName <- "96FMCFI-1G-CT-SS1"
