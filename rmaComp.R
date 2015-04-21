@@ -793,83 +793,86 @@ ggRma <- function(elected){
     theme(axis.title.y = element_text(size = 15, angle = 90))
 }
 
+#---------------------------------------------------------------------------
+#---------------------------------------------------------------------------
+#---------------------------------------------------------------------------
+#---------------------------------------------------------------------------
+# input1: date
+ymd <- "2015/02" 
+# input2: component name
+componentName <- "1400000907"
+componentName <- "1400004141"
+componentName <- "1410022431"
+componentName <- "AIMB-210G2-S6A1E" # not bad! golden is better!
+componentName <- "PCM-3375F-L0A1E" # not bad! golden is better!
+componentName <- "SQF-P10S2-4G-ETE" # not good...under estimate
+componentName <- "AIMB-762G2-00A1E" # need to take some time
+componentName <- "96DR-512M333NN-AP2" # time consuming
+componentName <- "PCA-6006LV-00B1" # ni = 65, failure rate too high... not good
+componentName <- "PCM-9375F-J0A1E" # red and golden are all over estimate 
+componentName <- "PCA-6003V-00A2E" # under estimate, no much difference between red and golden, take some time
+componentName <- "96MI-3OP-P2-AV" # amount too small
+componentName <- "PCA-6187VE-00A2E"
+componentName <- "1410006740" # can't judge which one is better, cum of gold will get up in the end
+componentName <- "9698967103E" # golden's est is good, a little bit underestimate
+componentName <- "PPC-102S-BARE-T" # n_break is zero...(remove DOA and out of warranty), golden est is zero!
+componentName <- "IPC-610P4-250-E" # n_break is zero...(remove DOA and out of warranty), golden est is zero!
+componentName <- "1701440159"
+componentName <- "XZFR-S-5158" # golden will over estimate, need to check
+componentName <- "1330000985"
 
-EmpiricalValue <- 0
-NonparametricValue <- 0
-MAValue <- 0
-MVTrendValue <- 0
-EstModified <- 0
-Differnce <- list()
-for (i in 1:length(pN)){
-  ymd <- "2015/02" # input 1
-  
-  componentName <- "1400000907"
-  componentName <- "1400004141"
-  componentName <- "1410022431"
-  componentName <- "AIMB-210G2-S6A1E" # not bad! golden is better!
-  componentName <- "PCM-3375F-L0A1E" # not bad! golden is better!
-  componentName <- "SQF-P10S2-4G-ETE" # not good...under estimate
-  componentName <- "AIMB-762G2-00A1E" # need to take some time
-  componentName <- "96DR-512M333NN-AP2" # time consuming
-  componentName <- "PCA-6006LV-00B1" # ni = 65, failure rate too high... not good
-  componentName <- "PCM-9375F-J0A1E" # red and golden are all over estimate 
-  componentName <- "PCA-6003V-00A2E" # under estimate, no much difference between red and golden, take some time
-  componentName <- "96MI-3OP-P2-AV" # amount too small
-  componentName <- "PCA-6187VE-00A2E"
-  componentName <- "1410006740" # can't judge which one is better, cum of gold will get up in the end
-  componentName <- "9698967103E" # golden's est is good, a little bit underestimate
-  componentName <- "PPC-102S-BARE-T" # n_break is zero...(remove DOA and out of warranty), golden est is zero!
-  componentName <- "IPC-610P4-250-E" # n_break is zero...(remove DOA and out of warranty), golden est is zero!
-  componentName <- "1701440159"
-  componentName <- "XZFR-S-5158" # golden will over estimate, need to check
-  componentName <- "1330000985"
-  
-  dataM <- dataArr(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
-  elected <- selectNi(dataM = dataM, YMD = ymd, maxNi = 1)
-  
-  #   par(mfrow = c(2, 1))
-  plot(1:nrow(elected), elected[, "nb"], 
-       xlab = "Date", ylab = "Amount", main = componentName,
-       pch = 16, type = "b", lty = 2, 
-       ylim = c(min(c(as.numeric(unlist(elected[, c(2, 3, 5, 6, 7)])))), max(c(as.numeric(unlist(elected[, c(2, 3, 5, 6, 7)]))))))
-  lines(1:nrow(elected), elected[, "Est"], col = "red", lwd = 2, type = "o")
-  lines(1:nrow(elected), elected[, "Empirical"], col = "blue", lwd = 2, type = "o")
-  lines(1:nrow(elected), elected[, "MVTrend"], col = "darkolivegreen", lwd = 2, type = "o")
-  lines(1:nrow(elected), elected[, "EstModified"], col = "darkgoldenrod", lwd = 2, type = "o")
-  lines(1:nrow(elected), elected[, "EstTs"], col = "purple", lwd = 2, type = "o")
-  legend("topleft", c("True", "Empirical", "Nonparametric", "MVTrend", "LinearEst", "LinearTsEst"), 
-         lty = c(2, 1, 1, 1, 1, 1), col =c("black", "blue",  "red", "darkolivegreen", "darkgoldenrod", "purple"), 
-         lwd = c(2, 2, 2, 2, 2, 2))  
-  
-  cumulatedNon <- cumsum(elected[, "Est"] - elected[, "nb"])
-  cumulatedEmp <- cumsum(elected[, "Empirical"] - elected[, "nb"])
-  cumulatedMVTrend <- cumsum(elected[, "MVTrend"] - elected[, "nb"])
-  cumulatedM <- cumsum(elected[, "EstModified"] - elected[, "nb"])
-  cumulatedTs <- cumsum(elected[, "EstTs"] - elected[, "nb"])
-  
-  plot(1:nrow(elected), rep(0, nrow(elected)), type = "l", pch = 0, 
-       ylim = c(min(c(cumulatedNon, cumulatedEmp, cumulatedMVTrend, cumulatedM, cumulatedTs)), 
-                max(c(cumulatedNon, cumulatedEmp, cumulatedMVTrend, cumulatedM, cumulatedTs))),
-       xlab = "Date", ylab = "Cumulated difference", 
-       main = componentName)
-  lines(1:nrow(elected), cumulatedNon, col = "red", lwd = 2)
-  lines(1:nrow(elected), cumulatedEmp, col = "blue", lwd = 2)
-  lines(1:nrow(elected), cumulatedMVTrend, col = "darkolivegreen", lwd = 2)
-  lines(1:nrow(elected), cumulatedM, col = "darkgoldenrod", lwd = 2)
-  lines(1:nrow(elected), cumulatedTs, col = "purple", lwd = 2)
-  legend("bottomleft", c("True", "Empirical", "Nonparametric", "MVTrend", "LinearEst"), 
-         lty = c(2, 1, 1, 1, 1, 1), col =c("black", "blue",  "red", "darkolivegreen", "darkgoldenrod", "purple"), 
-         lwd = c(2, 2, 2, 2, 2, 2))  
-  
-  
-  Differnce[[i]] <- data.frame(Empirical = cumulatedEmp, Nonparametric = cumulatedNon, MA = cumulatedMA, 
-                               ZLEMA = cumulatedZLEMA, Fusion = cumulatedFusion, MVTrend = cumulatedMVTrend)
-  EmpiricalValue[i] <- sum((as.numeric(elected[, "Empirical"]) - as.numeric(elected[, "nb"]))^2)
-  NonparametricValue[i] <- sum((as.numeric(elected[, "Est"]) - as.numeric(elected[, "nb"]))^2)
-  MVTrendValue[i] <- sum((as.numeric(elected[, "MVTrend"]) - as.numeric(elected[, "nb"]))^2)
-  EstModified[i] <- sum((as.numeric(elected[, "EstModified"]) - as.numeric(elected[, "nb"]))^2)
-  EstTs[i] <- sum((as.numeric(elected[, "EstTs"]) - as.numeric(elected[, "nb"]))^2)
-}
+
+dataM <- dataArr(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
+elected <- selectNi(dataM = dataM, YMD = ymd, maxNi = 1)
+
+#   par(mfrow = c(2, 1))
+plot(1:nrow(elected), elected[, "nb"], 
+     xlab = "Date", ylab = "Amount", main = componentName,
+     pch = 16, type = "b", lty = 2, 
+     ylim = c(min(c(as.numeric(unlist(elected[, c(2, 3, 5, 6, 7)])))), max(c(as.numeric(unlist(elected[, c(2, 3, 5, 6, 7)]))))))
+lines(1:nrow(elected), elected[, "Est"], col = "red", lwd = 2, type = "o")
+lines(1:nrow(elected), elected[, "Empirical"], col = "blue", lwd = 2, type = "o")
+lines(1:nrow(elected), elected[, "MVTrend"], col = "darkolivegreen", lwd = 2, type = "o")
+lines(1:nrow(elected), elected[, "EstModified"], col = "darkgoldenrod", lwd = 2, type = "o")
+lines(1:nrow(elected), elected[, "EstTs"], col = "purple", lwd = 2, type = "o")
+legend("topleft", c("True", "Empirical", "Nonparametric", "MVTrend", "LinearEst", "LinearTsEst"), 
+       lty = c(2, 1, 1, 1, 1, 1), col =c("black", "blue",  "red", "darkolivegreen", "darkgoldenrod", "purple"), 
+       lwd = c(2, 2, 2, 2, 2, 2))  
+
+cumulatedNon <- cumsum(elected[, "Est"] - elected[, "nb"])
+cumulatedEmp <- cumsum(elected[, "Empirical"] - elected[, "nb"])
+cumulatedMVTrend <- cumsum(elected[, "MVTrend"] - elected[, "nb"])
+cumulatedM <- cumsum(elected[, "EstModified"] - elected[, "nb"])
+cumulatedTs <- cumsum(elected[, "EstTs"] - elected[, "nb"])
+
+plot(1:nrow(elected), rep(0, nrow(elected)), type = "l", pch = 0, 
+     ylim = c(min(c(cumulatedNon, cumulatedEmp, cumulatedMVTrend, cumulatedM, cumulatedTs)), 
+              max(c(cumulatedNon, cumulatedEmp, cumulatedMVTrend, cumulatedM, cumulatedTs))),
+     xlab = "Date", ylab = "Cumulated difference", 
+     main = componentName)
+lines(1:nrow(elected), cumulatedNon, col = "red", lwd = 2)
+lines(1:nrow(elected), cumulatedEmp, col = "blue", lwd = 2)
+lines(1:nrow(elected), cumulatedMVTrend, col = "darkolivegreen", lwd = 2)
+lines(1:nrow(elected), cumulatedM, col = "darkgoldenrod", lwd = 2)
+lines(1:nrow(elected), cumulatedTs, col = "purple", lwd = 2)
+legend("bottomleft", c("True", "Empirical", "Nonparametric", "MVTrend", "LinearEst"), 
+       lty = c(2, 1, 1, 1, 1, 1), col =c("black", "blue",  "red", "darkolivegreen", "darkgoldenrod", "purple"), 
+       lwd = c(2, 2, 2, 2, 2, 2))  
+
+c(sum((as.numeric(elected[, "Empirical"]) - as.numeric(elected[, "nb"]))^2),
+  sum((as.numeric(elected[, "Est"]) - as.numeric(elected[, "nb"]))^2),
+  sum((as.numeric(elected[, "MVTrend"]) - as.numeric(elected[, "nb"]))^2),
+  sum((as.numeric(elected[, "EstModified"]) - as.numeric(elected[, "nb"]))^2),
+  sum((as.numeric(elected[, "EstTs"]) - as.numeric(elected[, "nb"]))^2))
+
+Differnce[[i]] <- data.frame(Empirical = cumulatedEmp, Nonparametric = cumulatedNon, MA = cumulatedMA, 
+                             ZLEMA = cumulatedZLEMA, Fusion = cumulatedFusion, MVTrend = cumulatedMVTrend)
+EmpiricalValue[i] <- sum((as.numeric(elected[, "Empirical"]) - as.numeric(elected[, "nb"]))^2)
+NonparametricValue[i] <- sum((as.numeric(elected[, "Est"]) - as.numeric(elected[, "nb"]))^2)
+MVTrendValue[i] <- sum((as.numeric(elected[, "MVTrend"]) - as.numeric(elected[, "nb"]))^2)
+EstModified[i] <- sum((as.numeric(elected[, "EstModified"]) - as.numeric(elected[, "nb"]))^2)
+EstTs[i] <- sum((as.numeric(elected[, "EstTs"]) - as.numeric(elected[, "nb"]))^2)
+
 
 
 tab <- data.frame(Empirical = round(EmpiricalValue, 3), 
