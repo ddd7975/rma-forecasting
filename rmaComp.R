@@ -751,8 +751,8 @@ selectNi <- function(dataM, YMD, maxNi = 5, currentDate){
   est.ts <- rep(0, nrow(dataFrame))
   est.ts[1:(ind - 1)] <- dataFrame[1:(ind - 1), "EstModified"]
   current <- which(dataFrame[, 1] == currentDate)
-  for (r in ind:nrow(dataFrame)){
-    if (r <= current){
+  if (length(current) == 0){
+    for (r in ind:nrow(dataFrame)){
       tmpTab <- dataFrame[1:(r - 1), ]
       endD <- as.character(tmpTab[(r - 1), 1])
       enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
@@ -763,19 +763,35 @@ selectNi <- function(dataM, YMD, maxNi = 5, currentDate){
       diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
       dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
       est.ts[r] <- dataFrame[r, "EstModified"] - dValue
-    }else{
-      tmpTab <- dataFrame[1:current, ]
-      endD <- as.character(tmpTab[current, 1])
-      enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
-      breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
-      fitB <- stl(breakTS, s.window="period")
-      estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
-      fitE <- stl(estTS, s.window="period")  
-      diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
-      dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
-      est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+    }
+  }else{
+    for (r in ind:nrow(dataFrame)){
+      if (r <= current){
+        tmpTab <- dataFrame[1:(r - 1), ]
+        endD <- as.character(tmpTab[(r - 1), 1])
+        enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
+        breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+        fitB <- stl(breakTS, s.window="period")
+        estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+        fitE <- stl(estTS, s.window="period")  
+        diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
+        dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
+        est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+      }else{
+        tmpTab <- dataFrame[1:current, ]
+        endD <- as.character(tmpTab[current, 1])
+        enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
+        breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+        fitB <- stl(breakTS, s.window="period")
+        estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+        fitE <- stl(estTS, s.window="period")  
+        diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
+        dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
+        est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+      }
     }
   }
+  
   neg <- which(est.ts < 0)
   if (length(neg) > 0){est.ts[neg] <- 0}
   dataFrame <- cbind(dataFrame, EstTs = est.ts)
@@ -812,8 +828,8 @@ ggRma <- function(elected){
 #---------------------------------------------------------------------------
 
 # input1: date
-ymd <- "2015/02" 
-currentDate <- "2015/04"
+currentDate <- "2015/4"
+ymd <- "2015/07" 
 # input2: component name
 componentName <- "1400000907"
 componentName <- "1400004141"
@@ -840,7 +856,8 @@ componentName <- "1330000985"
 dataM <- dataArr(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
 elected <- selectNi(dataM = dataM, YMD = ymd, maxNi = 1, currentDate = currentDate)
 
-#   par(mfrow = c(2, 1))
+##
+##
 plot(1:nrow(elected), elected[, "nb"], 
      xlab = "Date", ylab = "Amount", main = componentName,
      pch = 16, type = "b", lty = 2, 
@@ -859,7 +876,13 @@ cumulatedEmp <- cumsum(elected[, "Empirical"] - elected[, "nb"])
 cumulatedMVTrend <- cumsum(elected[, "MVTrend"] - elected[, "nb"])
 cumulatedM <- cumsum(elected[, "EstModified"] - elected[, "nb"])
 cumulatedTs <- cumsum(elected[, "EstTs"] - elected[, "nb"])
-
+mean(cumulatedNon)
+mean(cumulatedEmp)
+mean(cumulatedMVTrend)
+mean(cumulatedM)
+mean(cumulatedTs)
+##
+##
 plot(1:nrow(elected), rep(0, nrow(elected)), type = "l", pch = 0, 
      ylim = c(min(c(cumulatedNon, cumulatedEmp, cumulatedMVTrend, cumulatedM, cumulatedTs)), 
               max(c(cumulatedNon, cumulatedEmp, cumulatedMVTrend, cumulatedM, cumulatedTs))),
@@ -873,101 +896,85 @@ lines(1:nrow(elected), cumulatedTs, col = "purple", lwd = 2)
 legend("bottomleft", c("True", "Empirical", "Nonparametric", "MVTrend", "LinearEst"), 
        lty = c(2, 1, 1, 1, 1, 1), col =c("black", "blue",  "red", "darkolivegreen", "darkgoldenrod", "purple"), 
        lwd = c(2, 2, 2, 2, 2, 2))  
-
+##
+##
 c(sum((as.numeric(elected[, "Empirical"]) - as.numeric(elected[, "nb"]))^2),
   sum((as.numeric(elected[, "Est"]) - as.numeric(elected[, "nb"]))^2),
   sum((as.numeric(elected[, "MVTrend"]) - as.numeric(elected[, "nb"]))^2),
   sum((as.numeric(elected[, "EstModified"]) - as.numeric(elected[, "nb"]))^2),
   sum((as.numeric(elected[, "EstTs"]) - as.numeric(elected[, "nb"]))^2))
 
-Differnce[[i]] <- data.frame(Empirical = cumulatedEmp, Nonparametric = cumulatedNon, MA = cumulatedMA, 
-                             ZLEMA = cumulatedZLEMA, Fusion = cumulatedFusion, MVTrend = cumulatedMVTrend)
-EmpiricalValue[i] <- sum((as.numeric(elected[, "Empirical"]) - as.numeric(elected[, "nb"]))^2)
-NonparametricValue[i] <- sum((as.numeric(elected[, "Est"]) - as.numeric(elected[, "nb"]))^2)
-MVTrendValue[i] <- sum((as.numeric(elected[, "MVTrend"]) - as.numeric(elected[, "nb"]))^2)
-EstModified[i] <- sum((as.numeric(elected[, "EstModified"]) - as.numeric(elected[, "nb"]))^2)
-EstTs[i] <- sum((as.numeric(elected[, "EstTs"]) - as.numeric(elected[, "nb"]))^2)
-
-
-
-tab <- data.frame(Empirical = round(EmpiricalValue, 3), 
-                  Nonparametric = round(NonparametricValue, 3),
-                  MA = round(MAValue, 3), 
-                  ZLEMA = round(ZLEMAValue, 3), 
-                  Fusion = round(FusionValue, 3), 
-                  MVTrend = round(MVTrendValue, 3))
-# tab[1, ] <- c(90042.33, 75532.32, 37580.24)
-mini <- apply(tab, 1, min)
-tab <- cbind(tab, mini)
-rownames(tab) <- pN
-write.csv(tab, "C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\CompareWithEmpirical\\DistanceCompareV2.csv")
-
-
-
-#remove train data
-p <- 0.45
-trainMonth <- round(nrow(elected)*p)
-sum(elected$nb[1:trainMonth])/sum(elected$nb)
-
-sum((as.numeric(elected[1:trainMonth, "Empirical"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
-sum((as.numeric(elected[1:trainMonth, "Est"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
-sum((as.numeric(elected[1:trainMonth, "MVTrend"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
-sum((as.numeric(elected[1:trainMonth, "EstModified"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
-sum((as.numeric(elected[1:trainMonth, "EstTs"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
-
-testNb <- elected$nb[trainMonth:nrow(elected)]
-
-testNon <- elected$Est[trainMonth:nrow(elected)]
-testEmp <- elected$Empirical[trainMonth:nrow(elected)]
-testMVTrend <- elected$MVTrend[trainMonth:nrow(elected)]
-testModified <- elected$EstModified[trainMonth:nrow(elected)]
-testTs <- elected$EstTs[trainMonth:nrow(elected)]
-cumNon <- cumsum(testNon - testNb)
-cumEmp <- cumsum(testEmp - testNb)
-cumMVTrend <- cumsum(testMVTrend - testNb)
-cumModified <- cumsum(testModified - testNb)
-cumTs <- cumsum(testTs - testNb)
-
-
-plot(1:nrow(elected), rep(0, nrow(elected)), type = "l", 
-     ylim = c(min(cumNon, cumEmp, cumMVTrend, cumModified, cumTs), max(cumNon, cumEmp, cumMVTrend, cumModified, cumTs)), 
-     xlab = "Date", ylab = "cumulated difference", 
-     main = componentName)
-lines(trainMonth:nrow(elected), cumNon, col = "red")
-lines(trainMonth:nrow(elected), cumEmp, col = "blue")
-lines(trainMonth:nrow(elected), cumMVTrend, col = "darkolivegreen")
-lines(trainMonth:nrow(elected), cumModified, col = "darkgoldenrod")
-lines(trainMonth:nrow(elected), cumTs, col = "purple")
-
-# 當月餘料
-remainNon <- elected$Est - elected$nb
-remainEmp <- elected$Empirical - elected$nb
-remainMVTrend <- elected$MVTrend - elected$nb
-remainMod <- elected$EstModified - elected$nb
-remainTs <- elected$EstTs - elected$nb
-
-plot(1:length(remainNon), rep(0, length(remainNon)), type = "l", 
-     ylim = c(min(c(remainEmp, remainMVTrend, remainNon, remainMod, remainTs)), max(c(remainEmp, remainMVTrend, remainNon, remainMod, remainTs))), 
-     xlab = "Date", ylab = "remaining", 
-     main = "1410022431")
-lines(1:length(remainNon), remainNon, col = "red")
-lines(1:length(remainNon), remainEmp, col = "blue", lwd = 1)
-lines(1:length(remainNon), remainMVTrend, col = "darkolivegreen", lwd = 1)
-lines(1:length(remainNon), remainMod, col = "darkgoldenrod", lwd = 1)
-lines(1:length(remainNon), remainTs, col = "purple", lwd = 1)
-
-var(remainEmp)
-var(remainMVTrend)
-var(remainNon)
-
-# 缺料次數
-trainMonth <- round(nrow(elected)*p)
-sum(elected$nb[1:trainMonth])/sum(elected$nb)
-
-remainNon <- elected$Est - elected$nb
-remainEmp <- elected$Empirical - elected$nb
-remainMVTrend <- elected$MVTrend - elected$nb
-
-sum(remainNon[trainMonth:nrow(elected)] < 0)/length(remainNon)
-sum(remainEmp[trainMonth:nrow(elected)] < 0)/length(remainNon)
-sum(remainMVTrend[trainMonth:nrow(elected)] < 0)/length(remainNon)
+#-------------------------------------------------------------------------
+#-------------------------------------------------------------------------
+#-------------------------------------------------------------------------
+##
+## remove train data
+##
+# p <- 0.45
+# trainMonth <- round(nrow(elected)*p)
+# sum(elected$nb[1:trainMonth])/sum(elected$nb)
+# 
+# sum((as.numeric(elected[1:trainMonth, "Empirical"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
+# sum((as.numeric(elected[1:trainMonth, "Est"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
+# sum((as.numeric(elected[1:trainMonth, "MVTrend"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
+# sum((as.numeric(elected[1:trainMonth, "EstModified"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
+# sum((as.numeric(elected[1:trainMonth, "EstTs"]) - as.numeric(elected[1:trainMonth, "nb"]))^2)
+# 
+# testNb <- elected$nb[trainMonth:nrow(elected)]
+# 
+# testNon <- elected$Est[trainMonth:nrow(elected)]
+# testEmp <- elected$Empirical[trainMonth:nrow(elected)]
+# testMVTrend <- elected$MVTrend[trainMonth:nrow(elected)]
+# testModified <- elected$EstModified[trainMonth:nrow(elected)]
+# testTs <- elected$EstTs[trainMonth:nrow(elected)]
+# cumNon <- cumsum(testNon - testNb)
+# cumEmp <- cumsum(testEmp - testNb)
+# cumMVTrend <- cumsum(testMVTrend - testNb)
+# cumModified <- cumsum(testModified - testNb)
+# cumTs <- cumsum(testTs - testNb)
+# 
+# 
+# plot(1:nrow(elected), rep(0, nrow(elected)), type = "l", 
+#      ylim = c(min(cumNon, cumEmp, cumMVTrend, cumModified, cumTs), max(cumNon, cumEmp, cumMVTrend, cumModified, cumTs)), 
+#      xlab = "Date", ylab = "cumulated difference", 
+#      main = componentName)
+# lines(trainMonth:nrow(elected), cumNon, col = "red")
+# lines(trainMonth:nrow(elected), cumEmp, col = "blue")
+# lines(trainMonth:nrow(elected), cumMVTrend, col = "darkolivegreen")
+# lines(trainMonth:nrow(elected), cumModified, col = "darkgoldenrod")
+# lines(trainMonth:nrow(elected), cumTs, col = "purple")
+# 
+# # 當月餘料
+# remainNon <- elected$Est - elected$nb
+# remainEmp <- elected$Empirical - elected$nb
+# remainMVTrend <- elected$MVTrend - elected$nb
+# remainMod <- elected$EstModified - elected$nb
+# remainTs <- elected$EstTs - elected$nb
+# 
+# plot(1:length(remainNon), rep(0, length(remainNon)), type = "l", 
+#      ylim = c(min(c(remainEmp, remainMVTrend, remainNon, remainMod, remainTs)), max(c(remainEmp, remainMVTrend, remainNon, remainMod, remainTs))), 
+#      xlab = "Date", ylab = "remaining", 
+#      main = "1410022431")
+# lines(1:length(remainNon), remainNon, col = "red", lwd = 2)
+# lines(1:length(remainNon), remainEmp, col = "blue", lwd = 2)
+# lines(1:length(remainNon), remainMVTrend, col = "darkolivegreen", lwd = 2)
+# lines(1:length(remainNon), remainMod, col = "darkgoldenrod", lwd = 2)
+# lines(1:length(remainNon), remainTs, col = "purple", lwd = 2)
+# 
+# var(remainEmp)
+# var(remainMVTrend)
+# var(remainNon)
+# var(remainMod)
+# var(remainTs)
+# 
+# # 缺料次數
+# trainMonth <- round(nrow(elected)*p)
+# sum(elected$nb[1:trainMonth])/sum(elected$nb)
+# 
+# remainNon <- elected$Est - elected$nb
+# remainEmp <- elected$Empirical - elected$nb
+# remainMVTrend <- elected$MVTrend - elected$nb
+# 
+# sum(remainNon[trainMonth:nrow(elected)] < 0)/length(remainNon)
+# sum(remainEmp[trainMonth:nrow(elected)] < 0)/length(remainNon)
+# sum(remainMVTrend[trainMonth:nrow(elected)] < 0)/length(remainNon)
