@@ -234,7 +234,7 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
     }
   }
   
-  return(list(c(minY, minM, minD), dataComp_c, datShipPro, dat_censored1, n_break, dat_future_shipping_pro, estEmpirical))
+  return(list(c(minY, minM, minD), dataComp_c, datShipPro, dat_censored1, n_break, estEmpirical))
 }
 # ----- Nonparametric Estimation
 rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
@@ -247,7 +247,6 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
   endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
   x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
                          as.Date(endMonth), "months"))
-  
   
   x <- as.character(sapply(x1, function(y){
     tmp <- strsplit(y, "-")[[1]]
@@ -286,11 +285,11 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
   for (l in 1:length(nList)){
     colnames(nList[[l]]) <- x_mid[1:(length(x_mid) - 1)]
   }
-  if (is.null(dataM[[6]]) == FALSE){
-    for (n in 1:nrow(dataM[[6]])){
-      n_ship[which(colnames(n_ship) == dataM[[6]][n, 1])] <- as.numeric(dataM[[6]][n, 3])
-    }
-  }
+  #   if (is.null(dataM[[6]]) == FALSE){
+  #     for (n in 1:nrow(dataM[[6]])){
+  #       n_ship[which(colnames(n_ship) == dataM[[6]][n, 1])] <- as.numeric(dataM[[6]][n, 3])
+  #     }
+  #   }
   names(nList) <- uniqueProduct
   # ----- Make the table, 1st column is time point, 2nd column is attribute. 
   # ----- 1. attribute = 1 means failure data
@@ -302,7 +301,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     n_ship <- nList[[num]]
     proName <- uniqueProduct[num]
     ##
-    ## for caculate censored 
+    ## for censored 
     ##
     lf_nonBroken <- as.numeric(strptime(endMonth, "%Y-%m-%d") - strptime(as.character(colnames(n_ship)), "%Y/%m/%d"))
     dat_attr3 <- as.data.frame(cbind(lifeTime = lf_nonBroken, attribute = rep("3", length(lf_nonBroken))))
@@ -761,7 +760,7 @@ selectNi <- function(dataM, YMD, maxNi = 5){
     estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
     fitE <- stl(estTS, s.window="period")  
     diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
-    dValue <- mean(diffValue[(length(diffValue) - 4):length(diffValue)])
+    dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
     est.ts[r] <- dataFrame[r, "EstModified"] - dValue
   }
   neg <- which(est.ts < 0)
@@ -803,6 +802,7 @@ EstModified <- 0
 Differnce <- list()
 for (i in 1:length(pN)){
   ymd <- "2015/02" # input 1
+  
   componentName <- "1400000907"
   componentName <- "1400004141"
   componentName <- "1410022431"
@@ -824,7 +824,7 @@ for (i in 1:length(pN)){
   componentName <- "XZFR-S-5158" # golden will over estimate, need to check
   componentName <- "1330000985"
   
-  dataM <- dataArr(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = NULL, componentName = componentName, YMD = ymd)
+  dataM <- dataArr(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
   elected <- selectNi(dataM = dataM, YMD = ymd, maxNi = 1)
   
   #   par(mfrow = c(2, 1))
@@ -841,7 +841,6 @@ for (i in 1:length(pN)){
          lty = c(2, 1, 1, 1, 1, 1), col =c("black", "blue",  "red", "darkolivegreen", "darkgoldenrod", "purple"), 
          lwd = c(2, 2, 2, 2, 2, 2))  
   
-  
   cumulatedNon <- cumsum(elected[, "Est"] - elected[, "nb"])
   cumulatedEmp <- cumsum(elected[, "Empirical"] - elected[, "nb"])
   cumulatedMVTrend <- cumsum(elected[, "MVTrend"] - elected[, "nb"])
@@ -849,8 +848,8 @@ for (i in 1:length(pN)){
   cumulatedTs <- cumsum(elected[, "EstTs"] - elected[, "nb"])
   
   plot(1:nrow(elected), rep(0, nrow(elected)), type = "l", pch = 0, 
-       ylim = c(min(c(cumulatedNon, cumulatedEmp, cumulatedMVTrend, cumulatedM)), 
-                max(c(cumulatedNon, cumulatedEmp, cumulatedMVTrend, cumulatedM))),
+       ylim = c(min(c(cumulatedNon, cumulatedEmp, cumulatedMVTrend, cumulatedM, cumulatedTs)), 
+                max(c(cumulatedNon, cumulatedEmp, cumulatedMVTrend, cumulatedM, cumulatedTs))),
        xlab = "Date", ylab = "Cumulated difference", 
        main = componentName)
   lines(1:nrow(elected), cumulatedNon, col = "red", lwd = 2)
