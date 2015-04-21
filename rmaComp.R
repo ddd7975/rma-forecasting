@@ -14,10 +14,10 @@ dat_com <- sqlQuery(conn, "SELECT [Order_No]
 dat_shipping <- sqlQuery(conn, "SELECT [Shipping_DT], [Product_Name], [Qty]
                          FROM [SBA].[dbo].[EAI_Shipping]")
 
-# save(dat_all, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
-# save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
+save(dat_all, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
+save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
 # # save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/David79.Tseng/advantechProject/RMA/dat_com.RData")
-# save(dat_shipping, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_future_shipping.RData")
+save(dat_shipping, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_future_shipping.RData")
 
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
@@ -268,7 +268,8 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     proName <- uniqueProduct[i]
     datShipPro_i <- datShipPro[which(datShipPro$Product_Name == proName), ]
     n_ship <- 0
-    for (j in 1:(length(x_split) - 1)){
+    #     for (j in 1:(length(x_split) - 1)){
+    for (j in 1:(length(x_split))){
       xi <- x_split[j]
       n_ship[j] <- sum(datShipPro_i[which(datShipPro_i$Shipping_DT == xi), "Qty"])
       if (n_ship[j] < 0)n_ship[j] <- 0
@@ -283,13 +284,9 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     paste(tmpd, collapse = "/")
   })
   for (l in 1:length(nList)){
-    colnames(nList[[l]]) <- x_mid[1:(length(x_mid) - 1)]
+    #     colnames(nList[[l]]) <- x_mid[1:(length(x_mid) - 1)]
+    colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
   }
-  #   if (is.null(dataM[[6]]) == FALSE){
-  #     for (n in 1:nrow(dataM[[6]])){
-  #       n_ship[which(colnames(n_ship) == dataM[[6]][n, 1])] <- as.numeric(dataM[[6]][n, 3])
-  #     }
-  #   }
   names(nList) <- uniqueProduct
   # ----- Make the table, 1st column is time point, 2nd column is attribute. 
   # ----- 1. attribute = 1 means failure data
@@ -441,13 +438,14 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     ##
     ## probMapping is a function that can map a given timeRange(tpIni, tpEnd) to failureTable to get the probability.
     ##
+    uniTimePointWithZero <- c(0, uniTimePoint)
     probMapping <- function(tpIni, tpEnd, index, ftab){
-      if (tpIni %in% uniTimePoint & tpEnd %in% uniTimePoint){
-        row1 <- ftab[which(uniTimePoint == tpIni), ]
-        row2 <- ftab[which(uniTimePoint == tpEnd), ]
+      if (tpIni %in% uniTimePointWithZero & tpEnd %in% uniTimePointWithZero){
+        row1 <- ftab[which(uniTimePointWithZero == tpIni), ]
+        row2 <- ftab[which(uniTimePointWithZero == tpEnd), ]
         f1 <- row1[index]; f2 <- row2[index]
         if (f1 == 0){
-          iniRow1 <- iniRow2 <- which(uniTimePoint == tpIni)
+          iniRow1 <- iniRow2 <- which(uniTimePointWithZero == tpIni)
           while(ftab[iniRow1, index] == 0){
             if (iniRow1 == 1)break
             iniRow1 <- iniRow1 - 1
@@ -456,12 +454,12 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
             if (iniRow2 == nrow(ftab))break
             iniRow2 <- iniRow2 + 1
           }
-          proportion <- (tpIni - uniTimePoint[iniRow1])/(uniTimePoint[iniRow2] - uniTimePoint[iniRow1])
+          proportion <- (tpIni - uniTimePointWithZero[iniRow1])/(uniTimePointWithZero[iniRow2] - uniTimePointWithZero[iniRow1])
           f1 <- ftab[iniRow1, index] + proportion*(ftab[iniRow2, index] - ftab[iniRow1, index])
         }
         #-----
         if (f2 == 0){
-          endRow1 <- endRow2 <- which(uniTimePoint == tpEnd)
+          endRow1 <- endRow2 <- which(uniTimePointWithZero == tpEnd)
           while(ftab[endRow1, index] == 0){
             if (endRow1 == 1)break
             endRow1 <- endRow1 - 1
@@ -470,24 +468,26 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
             if (endRow2 == nrow(ftab))break
             endRow2 <- endRow2 + 1
           }
-          proportion <- (tpEnd - uniTimePoint[endRow1])/(uniTimePoint[endRow2] - uniTimePoint[endRow1])
+          proportion <- (tpEnd - uniTimePointWithZero[endRow1])/(uniTimePointWithZero[endRow2] - uniTimePointWithZero[endRow1])
           f2 <- ftab[endRow1, index] + proportion*(ftab[endRow2, index] - ftab[endRow1, index])
         }
         
         prob <- f2 - f1
       }else{
-        if (length(which(uniTimePoint <= tpIni)) == 0){
-          iniNear1 <- min(uniTimePoint)
+        if (length(which(uniTimePointWithZero <= tpIni)) == 0){
+          iniNear1 <- min(uniTimePointWithZero)
         }else{
-          iniNear1 <- uniTimePoint[max(which(uniTimePoint <= tpIni))]  
+          iniNear1 <- uniTimePointWithZero[max(which(uniTimePointWithZero <= tpIni))]  
         }
         
-        iniNear2 <- uniTimePoint[min(which(uniTimePoint > tpIni))]
-        f11 <- ftab[which(uniTimePoint == iniNear1), index]
-        f12 <- ftab[which(uniTimePoint == iniNear2), index]
+        iniNear2 <- uniTimePointWithZero[min(which(uniTimePointWithZero > tpIni))]
+        #         f11 <- ftab[which(uniTimePoint == iniNear1), index]
+        #         f12 <- ftab[which(uniTimePoint == iniNear2), index]
+        f11 <- ftab[which(runiTimePointWithZero == iniNear1), index]
+        f12 <- ftab[which(uniTimePointWithZero == iniNear2), index]
         
         if (f11 == 0){
-          iniRow1 <- iniRow2 <- which(uniTimePoint == iniNear1)
+          iniRow1 <- iniRow2 <- which(uniTimePointWithZero == iniNear1)
           ###
           while(ftab[iniRow1, index] == 0){
             if (iniRow1 == 1)break
@@ -498,11 +498,11 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
             if (iniRow2 == nrow(ftab))break
             iniRow2 <- iniRow2 + 1
           }
-          proportion <- (iniNear1 - uniTimePoint[iniRow1])/(uniTimePoint[iniRow2] - uniTimePoint[iniRow1])
+          proportion <- (iniNear1 - uniTimePointWithZero[iniRow1])/(uniTimePointWithZero[iniRow2] - uniTimePointWithZero[iniRow1])
           f11 <- ftab[iniRow1, index] + proportion*(ftab[iniRow2, index] - ftab[iniRow1, index])
         }
         if (f12 == 0){
-          iniRow1 <- iniRow2 <- which(uniTimePoint == iniNear2)
+          iniRow1 <- iniRow2 <- which(uniTimePointWithZero == iniNear2)
           while(ftab[iniRow1, index] == 0){
             if (iniRow1 == 1)break
             iniRow1 <- iniRow1 - 1
@@ -511,11 +511,11 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
             if (iniRow2 == nrow(ftab))break
             iniRow2 <- iniRow2 + 1
           }
-          proportion <- (iniNear2 - uniTimePoint[iniRow1])/(uniTimePoint[iniRow2] - uniTimePoint[iniRow1])
+          proportion <- (iniNear2 - uniTimePointWithZero[iniRow1])/(uniTimePointWithZero[iniRow2] - uniTimePointWithZero[iniRow1])
           f12 <- ftab[iniRow1, index] + proportion*(ftab[iniRow2, index] - ftab[iniRow1, index])
         }      
         
-        if (length(which(uniTimePoint <= tpIni)) == 0){
+        if (length(which(uniTimePointWithZero <= tpIni)) == 0){
           proportion <- 1
         }else{
           proportion <- (tpIni - iniNear1)/(iniNear2 - iniNear1)
@@ -523,18 +523,18 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
         prob_tpIni <- f11 + proportion*(f12 - f11)
         # -----
         
-        if (length(which(uniTimePoint <= tpIni)) == 0){
-          endNear1 <- min(uniTimePoint)
+        if (length(which(uniTimePointWithZero <= tpIni)) == 0){
+          endNear1 <- min(uniTimePointWithZero)
         }else{
-          endNear1 <- uniTimePoint[max(which(uniTimePoint < tpEnd))]
+          endNear1 <- uniTimePointWithZero[max(which(uniTimePointWithZero < tpEnd))]
         }
         
-        endNear2 <- uniTimePoint[min(which(uniTimePoint > tpEnd))]
-        f21 <- ftab[which(uniTimePoint == endNear1), index]
-        f22 <- ftab[which(uniTimePoint == endNear2), index]
+        endNear2 <- uniTimePointWithZero[min(which(uniTimePointWithZero > tpEnd))]
+        f21 <- ftab[which(uniTimePointWithZero == endNear1), index]
+        f22 <- ftab[which(uniTimePointWithZero == endNear2), index]
         
         if (f21 == 0){
-          endRow1 <- endRow2 <- which(uniTimePoint == endNear1)
+          endRow1 <- endRow2 <- which(uniTimePointWithZero == endNear1)
           while(ftab[endRow1, index] == 0){
             if (endRow1 == 1)break
             endRow1 <- endRow1 - 1
@@ -543,11 +543,11 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
             if (endRow2 == nrow(ftab))break
             endRow2 <- endRow2 + 1
           }
-          proportion <- (endNear1 - uniTimePoint[endRow1])/(uniTimePoint[endRow2] - uniTimePoint[endRow1])
+          proportion <- (endNear1 - uniTimePointWithZero[endRow1])/(uniTimePointWithZero[endRow2] - uniTimePointWithZero[endRow1])
           f21 <- ftab[endRow1, index] + proportion*(ftab[endRow2, index] - ftab[endRow1, index])
         }
         if (f22 == 0){
-          endRow1 <- endRow2 <- which(uniTimePoint == endNear2)
+          endRow1 <- endRow2 <- which(uniTimePointWithZero == endNear2)
           while(ftab[endRow1, index] == 0){
             if (endRow1 == 1)break
             endRow1 <- endRow1 - 1
@@ -556,10 +556,10 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
             if (endRow2 == nrow(ftab))break
             endRow2 <- endRow2 + 1
           }
-          proportion <- (endNear2 - uniTimePoint[endRow1])/(uniTimePoint[endRow2] - uniTimePoint[endRow1])
+          proportion <- (endNear2 - uniTimePointWithZero[endRow1])/(uniTimePointWithZero[endRow2] - uniTimePointWithZero[endRow1])
           f22 <- ftab[endRow1, index] + proportion*(ftab[endRow2, index] - ftab[endRow1, index])
         }      
-        if (length(which(uniTimePoint <= tpEnd)) == 0){
+        if (length(which(uniTimePointWithZero <= tpEnd)) == 0){
           proportion <- 1
         }else{
           proportion <- (tpEnd - endNear1)/(endNear2 - endNear1)
@@ -572,14 +572,14 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     }
     failureTableModified <- failureTable
     if (sum(failureTable[, 1] != 0) > 10){
-      y <- failureTableModified[which(failureTableModified[, 1] != 0), 5]
-      x <- as.numeric(rownames(failureTableModified)[which(failureTableModified[, 1] != 0)])
+      Y <- failureTableModified[which(failureTableModified[, 1] != 0), 5]
+      X <- as.numeric(rownames(failureTableModified)[which(failureTableModified[, 1] != 0)])
       #
       # remove the max value
       #
-      x <- x[-which(y == max(y))]
-      y <- y[-which(y == max(y))]
-      fit <- lm(y ~ x)
+      X <- X[-which(Y == max(Y))]
+      Y <- Y[-which(Y == max(Y))]
+      fit <- lm(Y ~ X)
       #
       # model:y = ax + b
       #
@@ -588,7 +588,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
       # last di location 
       #
       lastDi <- max(which(failureTable[, 1] != 0))
-      fr <- a*uniTimePoint[(lastDi+1):nrow(failureTable)] + b
+      fr <- a*uniTimePointWithZero[(lastDi+1):nrow(failureTable)] + b
       failureTableModified[(lastDi+1):nrow(failureTable), 5] <- fr
     }
     
@@ -744,7 +744,7 @@ selectNi <- function(dataM, YMD, maxNi = 5){
   EstModified <- EstStorage[[minNi]][, 5]
   
   dataFrame <- data.frame(x = xDate, nb = nb, Est = Est, Lower = Lower, Upper = Upper, 
-                          MVTrend = MVTrend, EstModified = EstModified, Empirical = dataM[[7]])
+                          MVTrend = MVTrend, EstModified = EstModified, Empirical = dataM[[6]])
   ## use time series to let the estimation close to the truth.
   ## ind is set as 30, because the frequency in time series is set as 12, it need at least 2 period.
   ind <- 30
