@@ -642,7 +642,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
   return(list(Est, EstLower, EstUpper, EstM))
 }
 # ----- Selection mechanism
-selectNi <- function(dataM, YMD, maxNi = 5){
+selectNi <- function(dataM, YMD, maxNi = 5, currentDate){
   n_break <- dataM[[5]]
   minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
   
@@ -750,18 +750,31 @@ selectNi <- function(dataM, YMD, maxNi = 5){
   ind <- 30
   est.ts <- rep(0, nrow(dataFrame))
   est.ts[1:(ind - 1)] <- dataFrame[1:(ind - 1), "EstModified"]
+  current <- which(dataFrame[, 1] == currentDate)
   for (r in ind:nrow(dataFrame)){
-    #     print(r/nrow(dataFrame))
-    tmpTab <- dataFrame[1:(r - 1), ]
-    endD <- as.character(tmpTab[(r - 1), 1])
-    enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
-    breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
-    fitB <- stl(breakTS, s.window="period")
-    estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
-    fitE <- stl(estTS, s.window="period")  
-    diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
-    dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
-    est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+    if (r <= current){
+      tmpTab <- dataFrame[1:(r - 1), ]
+      endD <- as.character(tmpTab[(r - 1), 1])
+      enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
+      breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+      fitB <- stl(breakTS, s.window="period")
+      estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+      fitE <- stl(estTS, s.window="period")  
+      diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
+      dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
+      est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+    }else{
+      tmpTab <- dataFrame[1:current, ]
+      endD <- as.character(tmpTab[current, 1])
+      enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
+      breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+      fitB <- stl(breakTS, s.window="period")
+      estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+      fitE <- stl(estTS, s.window="period")  
+      diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
+      dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
+      est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+    }
   }
   neg <- which(est.ts < 0)
   if (length(neg) > 0){est.ts[neg] <- 0}
@@ -797,8 +810,10 @@ ggRma <- function(elected){
 #---------------------------------------------------------------------------
 #---------------------------------------------------------------------------
 #---------------------------------------------------------------------------
+
 # input1: date
 ymd <- "2015/02" 
+currentDate <- "2015/04"
 # input2: component name
 componentName <- "1400000907"
 componentName <- "1400004141"
@@ -823,7 +838,7 @@ componentName <- "1330000985"
 
 
 dataM <- dataArr(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
-elected <- selectNi(dataM = dataM, YMD = ymd, maxNi = 1)
+elected <- selectNi(dataM = dataM, YMD = ymd, maxNi = 1, currentDate = currentDate)
 
 #   par(mfrow = c(2, 1))
 plot(1:nrow(elected), elected[, "nb"], 
