@@ -300,7 +300,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     ##
     ## for censored 
     ##
-    lf_nonBroken <- as.numeric(strptime(endMonth, "%Y-%m-%d") - strptime(as.character(colnames(n_ship)), "%Y/%m/%d"))
+    lf_nonBroken <- as.numeric(strptime(endMonth, "%Y-%m-%d") - strptime(as.character(colnames(n_ship))[-ncol(n_ship)], "%Y/%m/%d"))
     dat_attr3 <- as.data.frame(cbind(lifeTime = lf_nonBroken, attribute = rep("3", length(lf_nonBroken))))
     ##
     ## ---- dataComp_c includes all the data, it need to remove the Receive_DT after YMD.
@@ -434,7 +434,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     ## ----- Start to build the process of calculation 
     ## unit: day
     ## Add the currently ()
-    timePoint <- rev(c(strptime(endMonth, "%Y-%m-%d") - strptime(colnames(n_ship), "%Y/%m/%d"), 0))
+    timePoint <- rev(c(strptime(endMonth, "%Y-%m-%d") - strptime(colnames(n_ship)[-ncol(n_ship)], "%Y/%m/%d"), 0))
     ##
     ## probMapping is a function that can map a given timeRange(tpIni, tpEnd) to failureTable to get the probability.
     ##
@@ -483,7 +483,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
         iniNear2 <- uniTimePointWithZero[min(which(uniTimePointWithZero > tpIni))]
         #         f11 <- ftab[which(uniTimePoint == iniNear1), index]
         #         f12 <- ftab[which(uniTimePoint == iniNear2), index]
-        f11 <- ftab[which(runiTimePointWithZero == iniNear1), index]
+        f11 <- ftab[which(uniTimePointWithZero == iniNear1), index]
         f12 <- ftab[which(uniTimePointWithZero == iniNear2), index]
         
         if (f11 == 0){
@@ -849,13 +849,20 @@ componentName <- "9698967103E" # golden's est is good, a little bit underestimat
 componentName <- "PPC-102S-BARE-T" # n_break is zero...(remove DOA and out of warranty), golden est is zero!
 componentName <- "IPC-610P4-250-E" # n_break is zero...(remove DOA and out of warranty), golden est is zero!
 componentName <- "1701440159"
-componentName <- "XZFR-S-5158" # golden will over estimate, need to check
+componentName <- "XZFR-S-5158" # data too narrow
 componentName <- "1330000985"
+componentName <- "96VG-256M-P-SP"
+componentName <- "PCI-1721-AE"
+componentName <- "96HD750G-ST-SG7K"
+componentName <- "1124518191"
+unique(dat_com$PartNumber)[600:800]
 
 
+t1 = proc.time()
 dataM <- dataArr(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
 elected <- selectNi(dataM = dataM, YMD = ymd, maxNi = 1, currentDate = currentDate)
-
+t2 = proc.time()
+t2 - t1
 ##
 ##
 plot(1:nrow(elected), elected[, "nb"], 
@@ -876,11 +883,6 @@ cumulatedEmp <- cumsum(elected[, "Empirical"] - elected[, "nb"])
 cumulatedMVTrend <- cumsum(elected[, "MVTrend"] - elected[, "nb"])
 cumulatedM <- cumsum(elected[, "EstModified"] - elected[, "nb"])
 cumulatedTs <- cumsum(elected[, "EstTs"] - elected[, "nb"])
-mean(cumulatedNon)
-mean(cumulatedEmp)
-mean(cumulatedMVTrend)
-mean(cumulatedM)
-mean(cumulatedTs)
 ##
 ##
 plot(1:nrow(elected), rep(0, nrow(elected)), type = "l", pch = 0, 
@@ -898,11 +900,16 @@ legend("bottomleft", c("True", "Empirical", "Nonparametric", "MVTrend", "LinearE
        lwd = c(2, 2, 2, 2, 2, 2))  
 ##
 ##
-c(sum((as.numeric(elected[, "Empirical"]) - as.numeric(elected[, "nb"]))^2),
-  sum((as.numeric(elected[, "Est"]) - as.numeric(elected[, "nb"]))^2),
-  sum((as.numeric(elected[, "MVTrend"]) - as.numeric(elected[, "nb"]))^2),
-  sum((as.numeric(elected[, "EstModified"]) - as.numeric(elected[, "nb"]))^2),
-  sum((as.numeric(elected[, "EstTs"]) - as.numeric(elected[, "nb"]))^2))
+mse <- c(sum((as.numeric(elected[, "Empirical"]) - as.numeric(elected[, "nb"]))^2),
+         sum((as.numeric(elected[, "Est"]) - as.numeric(elected[, "nb"]))^2),
+         sum((as.numeric(elected[, "MVTrend"]) - as.numeric(elected[, "nb"]))^2),
+         sum((as.numeric(elected[, "EstModified"]) - as.numeric(elected[, "nb"]))^2),
+         sum((as.numeric(elected[, "EstTs"]) - as.numeric(elected[, "nb"]))^2))
+averageShortage <- c(abs(mean(cumulatedEmp)),
+                     abs(mean(cumulatedNon)),
+                     abs(mean(cumulatedMVTrend)),
+                     abs(mean(cumulatedM)),
+                     abs(mean(cumulatedTs)))
 
 #-------------------------------------------------------------------------
 #-------------------------------------------------------------------------
