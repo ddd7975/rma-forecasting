@@ -56,38 +56,42 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   #
   # warranty type
   #
+  time11 <- proc.time()
   warranty_Type <- 0
   for (i in 1:nrow(dat_all_i)){
+    print(i/nrow(dat_all_i))
     orderDT <- as.character(dat_all_i[i, "Order_DT"])
     tmpOrder <- strsplit(orderDT, "\\/|\\:|\\-|\\ ")[[1]]
-    tmpOrder <- paste(tmpOrder[1:3], collapse = "/")
+    if (as.numeric(tmpOrder[1]) == max(suppressWarnings(as.numeric(tmpOrder)), na.rm = T)){
+      orderDate <- strptime(paste(tmpOrder[1:3], collapse = "/"), "%Y/%m/%d")
+    }else{
+      orderDate <- strptime(paste(tmpOrder[1:3], collapse = "/"), "%m/%d/%Y")
+    }
     warrDT <- as.character(dat_all_i[i, "Warranty_DT"])
     tmpWarr <- strsplit(warrDT, "\\/|\\:|\\-|\\ ")[[1]]
-    tmpWarr <- paste(tmpWarr[1:3], collapse = "/")
-    if (as.numeric(strsplit(orderDT, "\\/|\\:|\\-|\\ ")[[1]][1]) == max(as.numeric(strsplit(orderDT, "\\/|\\:|\\-|\\ ")[[1]]))){
-      orderDate <- strptime(tmpOrder, "%Y/%m/%d")
+    if (as.numeric(tmpWarr[1]) == max(suppressWarnings(as.numeric(tmpWarr)), na.rm = T)){
+      warrantyDate <- strptime(paste(tmpWarr[1:3], collapse = "/"), "%Y/%m/%d")
     }else{
-      orderDate <- strptime(tmpOrder, "%m/%d/%Y")
+      warrantyDate <- strptime(paste(tmpWarr[1:3], collapse = "/"), "%m/%d/%Y")
     }
-    if (as.numeric(strsplit(warrDT, "\\/|\\:|\\-|\\ ")[[1]][1]) == max(as.numeric(strsplit(warrDT, "\\/|\\:|\\-|\\ ")[[1]]), na.rm = T)){
-      warrantyDate <- strptime(tmpWarr, "%Y/%m/%d")
-    }else{
-      warrantyDate <- strptime(tmpWarr, "%m/%d/%Y")
-    }
-    
-    
     if (orderDate < warrantyDate){
       warranty_Type[i] <- "In"
     }else{
       warranty_Type[i] <- "Out"
     }
   }
+  time12 <- proc.time()
+  time12 - time11
   
+  ###--- need to speed up 
+  time21 <- proc.time()
   belongQty <- 0
   for (i in 1:nrow(dat_all_i)){
     print(i/nrow(dat_all_i))
     r <- dat_all_i[i, ]
+    #
     # same order_no and same item_no
+    #
     dattmp <- dat_com_iPos[which(dat_com_iPos$Order_No == as.character(r$Order_No) & dat_com_iPos$Item_No == as.character(r$item_No)), ]
     
     if (nrow(dattmp) != 0){
@@ -102,7 +106,8 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   }
   belongQty <- as.numeric(belongQty)
   dataComp <- cbind(dat_all_i[which(!is.na(belongQty)), ], qty = belongQty[!is.na(belongQty)], warrantyType = warranty_Type[!is.na(belongQty)])
-  
+  time22 <- proc.time()
+  time22 - time21
   #############################################
   ##                                         ##
   ## 將warranty的日資料加上MES_Shipping_DT上 ##
@@ -112,9 +117,8 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   MES_ch <- as.character(dataComp$MES_Shipping_DT)
   w_day <- 0 # Warranty day
   for (i in 1:length(warranty_ch)){
-    #     print(i/length(warranty_ch))
     print(i/length(warranty_ch))
-    tmp <- as.numeric(strsplit(warranty_ch[i], "\\/|\\-|:| ")[[1]])
+    tmp <- suppressWarnings(as.numeric(strsplit(warranty_ch[i], "\\/|\\-|:| ")[[1]]))
     if (length(tmp) == 6){tmp <- tmp[1:3]}
     if (max(tmp, na.rm=T) == tmp[1]){
       w_day[i] = tmp[3]
@@ -128,12 +132,13 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
     if (as.numeric(month) == 2){w_day[i] <- 27}
   }
   
-  MES_ch_withDay <- 0
-  for (i in 1:length(MES_ch)){
-    print(i/length(MES_ch))
-    MES_ch_withDay[i] <- paste(MES_ch[i], w_day[i], sep="/")
-  }
+  MES_ch_withDay <- sapply(1:length(MES_ch), function(i)MES_ch_withDay[i] <- paste(MES_ch[i], w_day[i], sep="/"))
+  #   MES_ch_withDay <- 0
+  #   for (i in 1:length(MES_ch)){
+  #     MES_ch_withDay[i] <- paste(MES_ch[i], w_day[i], sep="/")
+  #   }
   
+  MES_ch_withDay <- sapply(1:length(MES_ch), function(i)MES_ch_withDay[i] <- paste(MES_ch[i], w_day[i], sep="/"))
   #   shipDT <- dat_pca$Ship_DT[which(dat_pca$Ship_DT != "")]
   shipDT <- MES_ch_withDay[MES_ch_withDay != ""]
   msh <- as.character(min(as.Date(shipDT), na.rm = T))
@@ -153,11 +158,14 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
     MES_ch_withDay <- MES_ch_withDay[-which(is.na(time2))]
     time2 <- time2[-which(is.na(time2))]
   }
-  lf <- 0
-  for (i in 1:length(time1)){
-    print(i/length(time1))
-    lf[i] <- time1[i] - time2[i]
-  }
+  ###--- need to speed up 
+  lf <- sapply(1:length(time1), function(i)time1[i] - time2[i])
+  #   lf <- 0
+  #   for (i in 1:length(time1)){
+  #     print(i/length(time1))
+  #     lf[i] <- time1[i] - time2[i]
+  #   }
+  #
   dat_tmp <- cbind(dataComp, lifeTime = as.numeric(lf), MES_Shipping_Dt_withDay = MES_ch_withDay) 
   tempdel <- which(dat_tmp$lifeTime < 0 | is.na(lf))
   if (length(tempdel) != 0){
@@ -171,20 +179,9 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   # -----
   # -----
   # -----
-  # ----- n_break
-  CountReturn <- function(time1, time2, dat){
-    tc1 <- as.numeric(strptime(time1, "%Y/%m/%d"))
-    tc2 <- as.numeric(strptime(time2, "%Y/%m/%d"))
-    tmp <- which(tc1 <= as.numeric(strptime(dat$Receive_DT, "%Y/%m/%d")) & 
-                   as.numeric(strptime(dat$Receive_DT, "%Y/%m/%d")) < tc2)
-    n <- sum(dat[tmp, "qty"])
-    return(n)
-  }
   endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
   x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
                          as.Date(endMonth), "months"))
-  #   x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
-  #                          Sys.Date(), "months"))
   x <- as.character(sapply(x1, function(y){
     tmp <- strsplit(y, "-")[[1]]
     tmp[3] <- "01"
@@ -194,7 +191,6 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   if (minD != 1){
     x <- c(x, YMD)
   }
-  n_break <- 0
   #
   # remove data which is "out of warranty".
   #
@@ -204,11 +200,23 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   }else{
     dataOFW <- dataComp_c
   }
-  
-  for (i in 1:(length(x) - 1)){
-    print(i/(length(x) - 1))
-    n_break[i] <- CountReturn(x[i], x[i + 1], dataOFW)
+
+  # ----- n_break
+  receiveDt_timeform <- as.numeric(strptime(dataOFW$Receive_DT, "%Y/%m/%d"))
+  CountReturn <- function(time1, time2){
+    tmp <- which(time1 <= receiveDt_timeform & 
+                   receiveDt_timeform < time2)
+    n <- sum(dat[tmp, "qty"])
+    return(n)
   }
+  x_timeForm <- as.numeric(strptime(x[-length(x)], "%Y/%m/%d"))
+  n_break <- 0
+  t31 <- proc.time()
+  for (i in 1:(length(x_timeForm))){
+    n_break[i] <- CountReturn(x_timeForm[i], x_timeForm[i + 1])
+  }
+  t32 <- proc.time()
+  t32 - t31
   n_break <- matrix(n_break, nrow=1)
   colnames(n_break) <- x[1:(length(x) - 1)]
   
@@ -226,7 +234,6 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   #---- method 2: moving average
   estEmpirical <- 0
   for (i in 1:length(n_break)){
-    print(i/length(n_break))
     if(i < 4){
       estEmpirical[i] <- 0
     }else{
@@ -856,11 +863,14 @@ componentName <- "96HD750G-ST-SG7K" # too small
 componentName <- "1124518191"
 componentName <- "1653000016"
 componentName <- "9680013278"
+componentName <- "14S4860600"
 unique(dat_com$PartNumber)[600:800]
 
-
 t1 = proc.time()
+tM1 <- proc.time()
 dataM <- dataArr(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
+tM2 <- proc.time()
+tM2 - tM1
 elected <- selectNi(dataM = dataM, YMD = ymd, maxNi = 1, currentDate = currentDate)
 t2 = proc.time()
 t2 - t1
