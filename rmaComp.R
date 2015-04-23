@@ -16,7 +16,7 @@ dat_shipping <- sqlQuery(conn, "SELECT [Shipping_DT], [Product_Name], [Qty]
 
 save(dat_all, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
 save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
-# # save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/David79.Tseng/advantechProject/RMA/dat_com.RData")
+# save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/David79.Tseng/advantechProject/RMA/dat_com.RData")
 save(dat_shipping, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_future_shipping.RData")
 
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
@@ -268,8 +268,8 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     proName <- uniqueProduct[i]
     datShipPro_i <- datShipPro[which(datShipPro$Product_Name == proName), ]
     n_ship <- 0
-    #     for (j in 1:(length(x_split) - 1)){
-    for (j in 1:(length(x_split))){
+    #     for (j in 1:(length(x_split))){
+    for (j in 1:(length(x_split) - 1)){
       xi <- x_split[j]
       n_ship[j] <- sum(datShipPro_i[which(datShipPro_i$Shipping_DT == xi), "Qty"])
       if (n_ship[j] < 0)n_ship[j] <- 0
@@ -284,8 +284,8 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     paste(tmpd, collapse = "/")
   })
   for (l in 1:length(nList)){
-    #     colnames(nList[[l]]) <- x_mid[1:(length(x_mid) - 1)]
-    colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
+    colnames(nList[[l]]) <- x_mid[1:(length(x_mid) - 1)]
+    #     colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
   }
   names(nList) <- uniqueProduct
   # ----- Make the table, 1st column is time point, 2nd column is attribute. 
@@ -300,7 +300,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     ##
     ## for censored 
     ##
-    lf_nonBroken <- as.numeric(strptime(endMonth, "%Y-%m-%d") - strptime(as.character(colnames(n_ship))[-ncol(n_ship)], "%Y/%m/%d"))
+    lf_nonBroken <- as.numeric(strptime(endMonth, "%Y-%m-%d") - strptime(as.character(colnames(n_ship)), "%Y/%m/%d"))
     dat_attr3 <- as.data.frame(cbind(lifeTime = lf_nonBroken, attribute = rep("3", length(lf_nonBroken))))
     ##
     ## ---- dataComp_c includes all the data, it need to remove the Receive_DT after YMD.
@@ -335,7 +335,6 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     failureTable[1, 3] <- n
     
     for (i in 2:(length(uniTimePoint) + 1)){
-      #       print(i/(length(uniTimePoint) + 1))
       tab <- tmpTableOrder[which(tmpTableOrder[, 1] == uniTimePoint[i - 1]), ]
       failureTable[i, 1] <- sum((tab[, 2] == 1))      # di
       failureTable[i, 2] <- sum((tab[, 2] == 2))      # ri
@@ -434,7 +433,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     ## ----- Start to build the process of calculation 
     ## unit: day
     ## Add the currently ()
-    timePoint <- rev(c(strptime(endMonth, "%Y-%m-%d") - strptime(colnames(n_ship)[-ncol(n_ship)], "%Y/%m/%d"), 0))
+    timePoint <- rev(c(strptime(endMonth, "%Y-%m-%d") - strptime(colnames(n_ship), "%Y/%m/%d"), 0))
     ##
     ## probMapping is a function that can map a given timeRange(tpIni, tpEnd) to failureTable to get the probability.
     ##
@@ -852,9 +851,11 @@ componentName <- "1701440159"
 componentName <- "XZFR-S-5158" # data too narrow
 componentName <- "1330000985"
 componentName <- "96VG-256M-P-SP"
-componentName <- "PCI-1721-AE"
-componentName <- "96HD750G-ST-SG7K"
+componentName <- "PCI-1721-AE" # too small
+componentName <- "96HD750G-ST-SG7K" # too small
 componentName <- "1124518191"
+componentName <- "1653000016"
+componentName <- "9680013278"
 unique(dat_com$PartNumber)[600:800]
 
 
