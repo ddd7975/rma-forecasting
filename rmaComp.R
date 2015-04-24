@@ -29,9 +29,12 @@ dat_future_shipping <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tsen
 colnames(dat_future_shipping) <- c("Shipping_DT", "Product_Name", "Qty")
 # ------------------------------
 # ------------------------------
+library(dplyr)
 # ------------------------------
 # ----- Data Arrangement
-dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = YMD){
+dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = YMD){
+  dat_all[] <- lapply(dat_all, as.character)
+  dat_com[] <- lapply(dat_com, as.character)
   dat_com_i <- dat_com[which(dat_com$PartNumber == componentName), ] # decide a part number
   qty <- as.character(dat_com_i$Qty) 
   qty[which(qty == "")] <- 1 # if qty is blank, change it to 1
@@ -89,10 +92,9 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   for (i in 1:nrow(dat_all_i)){
     print(i/nrow(dat_all_i))
     r <- dat_all_i[i, ]
-    #
-    # same order_no and same item_no
-    #
-    dattmp <- dat_com_iPos[which(dat_com_iPos$Order_No == as.character(r$Order_No) & dat_com_iPos$Item_No == as.character(r$item_No)), ]
+    ## match same order_no and same item_no
+    dattmp <- dat_com_iPos[which(dat_com_iPos$Order_No == r$Order_No & dat_com_iPos$Item_No == r$item_No), ]
+#     dattmp <- filter(dat_com_iPos, Order_No == r$Order_No, Item_No == r$item_No)
     
     if (nrow(dattmp) != 0){
       if (nrow(dattmp) == 1){
@@ -115,7 +117,7 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   #############################################
   warranty_ch <- as.character(dataComp$Warranty_DT)
   MES_ch <- as.character(dataComp$MES_Shipping_DT)
-  w_day <- 0 # Warranty day
+  w_day <- 0 
   for (i in 1:length(warranty_ch)){
     print(i/length(warranty_ch))
     tmp <- suppressWarnings(as.numeric(strsplit(warranty_ch[i], "\\/|\\-|:| ")[[1]]))
@@ -139,7 +141,6 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   #   }
   
   MES_ch_withDay <- sapply(1:length(MES_ch), function(i)MES_ch_withDay[i] <- paste(MES_ch[i], w_day[i], sep="/"))
-  #   shipDT <- dat_pca$Ship_DT[which(dat_pca$Ship_DT != "")]
   shipDT <- MES_ch_withDay[MES_ch_withDay != ""]
   msh <- as.character(min(as.Date(shipDT), na.rm = T))
   minShip <- paste(strsplit(msh, split = "-")[[1]], collapse = "/")
@@ -211,12 +212,9 @@ dataArr <- function(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_s
   }
   x_timeForm <- as.numeric(strptime(x[-length(x)], "%Y/%m/%d"))
   n_break <- 0
-  t31 <- proc.time()
   for (i in 1:(length(x_timeForm))){
     n_break[i] <- CountReturn(x_timeForm[i], x_timeForm[i + 1])
   }
-  t32 <- proc.time()
-  t32 - t31
   n_break <- matrix(n_break, nrow=1)
   colnames(n_break) <- x[1:(length(x) - 1)]
   
@@ -868,7 +866,7 @@ unique(dat_com$PartNumber)[600:800]
 
 t1 = proc.time()
 tM1 <- proc.time()
-dataM <- dataArr(dat_all = dat_all, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
+dataM <- dataArr(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
 tM2 <- proc.time()
 tM2 - tM1
 elected <- selectNi(dataM = dataM, YMD = ymd, maxNi = 1, currentDate = currentDate)
