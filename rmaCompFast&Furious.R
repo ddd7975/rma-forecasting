@@ -22,6 +22,8 @@ load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_shipping.RData")
 
+library(Rmpi)
+library(snow)
 # ----- prediction of future (by month)
 dat_future_shipping <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\futureNshippingTest.csv", 
                                 header = TRUE)
@@ -93,7 +95,6 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
     r <- dat_all_i[i, ]
     ## match same order_no and same item_no
     dattmp <- dat_com_iPos[which(dat_com_iPos$Order_No == r$Order_No & dat_com_iPos$Item_No == r$item_No), ]
-    #     dattmp <- filter(dat_com_iPos, Order_No == r$Order_No, Item_No == r$item_No)
     
     if (nrow(dattmp) != 0){
       if (nrow(dattmp) == 1){
@@ -133,7 +134,7 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
     if (as.numeric(month) == 2){w_day[i] <- 27}
   }
   
-  MES_ch_withDay <- sapply(1:length(MES_ch), function(i)MES_ch_withDay[i] <- paste(MES_ch[i], w_day[i], sep="/"))
+  MES_ch_withDay <- sapply(1:length(MES_ch), function(i)paste(MES_ch[i], w_day[i], sep="/"))
   #   MES_ch_withDay <- 0
   #   for (i in 1:length(MES_ch)){
   #     MES_ch_withDay[i] <- paste(MES_ch[i], w_day[i], sep="/")
@@ -203,7 +204,7 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
   
   # ----- n_break
   receiveDt_timeform <- as.numeric(strptime(dataOFW$Receive_DT, "%Y/%m/%d"))
-  CountReturn <- function(time1, time2){
+  CountReturn <- function(time1, time2, dat){
     tmp <- which(time1 <= receiveDt_timeform & 
                    receiveDt_timeform < time2)
     n <- sum(dat[tmp, "qty"])
@@ -212,7 +213,7 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
   x_timeForm <- as.numeric(strptime(x[-length(x)], "%Y/%m/%d"))
   n_break <- 0
   for (i in 1:(length(x_timeForm))){
-    n_break[i] <- CountReturn(x_timeForm[i], x_timeForm[i + 1])
+    n_break[i] <- CountReturn(x_timeForm[i], x_timeForm[i + 1], dataOFW)
   }
   n_break <- matrix(n_break, nrow=1)
   colnames(n_break) <- x[1:(length(x) - 1)]
@@ -240,65 +241,222 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
   
   return(list(c(minY, minM, minD), dataComp_c, datShipPro, dat_censored1, n_break, estEmpirical))
 }
-# ----- Nonparametric Estimation
-rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
-  minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
-  dataComp_c <- dataM[[2]]
-  datShipPro <- dataM[[3]]
-  dat_censored1 <- dataM[[4]]
-  n_break <- dataM[[5]]
-  
-  endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
-  x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
-                         as.Date(endMonth), "months"))
-  
-  x <- as.character(sapply(x1, function(y){
-    tmp <- strsplit(y, "-")[[1]]
-    tmp[3] <- "01"
-    tmp2 <- paste(tmp[1], tmp[2], tmp[3], sep="/")
-    return(tmp2)
-  }))
-  
-  # ----- split the x so that it can match the dat_shipping (because dat_shipping only record the amount by month)
-  x_split <- 0
-  for (i in 1:length(x)){
-    tmp <- strsplit(x[i], "/")[[1]]
-    x_split[i] <- paste0(tmp[1], tmp[2])
+#
+# ----- number of shipment
+#
+minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
+dataComp_c <- dataM[[2]]
+datShipPro <- dataM[[3]]
+dat_censored1 <- dataM[[4]]
+n_break <- dataM[[5]]
+# every month
+endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
+x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
+                       as.Date(endMonth), "months"))
+x <- as.character(sapply(x1, function(y){
+  tmp <- strsplit(y, "-")[[1]]
+  tmp[3] <- "01"
+  tmp2 <- paste(tmp[1], tmp[2], tmp[3], sep="/")
+  return(tmp2)
+}))
+# ----- split the x so that it can match the dat_shipping (because dat_shipping only record the amount by month)
+x_split <- 0
+for (i in 1:length(x)){
+  tmp <- strsplit(x[i], "/")[[1]]
+  x_split[i] <- paste0(tmp[1], tmp[2])
+}
+# shipment 
+uniqueProduct <- as.character(unique(datShipPro$Product_Name))
+nList <- list()
+for (i in 1:length(uniqueProduct)){
+  proName <- uniqueProduct[i]
+  datShipPro_i <- datShipPro[which(datShipPro$Product_Name == proName), ]
+  n_ship <- 0
+  for (j in 1:(length(x_split))){
+  #   for (j in 1:(length(x_split) - 1)){
+    xi <- x_split[j]
+    n_ship[j] <- sum(datShipPro_i[which(datShipPro_i$Shipping_DT == xi), "Qty"])
+    if (n_ship[j] < 0)n_ship[j] <- 0
   }
-  
-  uniqueProduct <- as.character(unique(datShipPro$Product_Name))
-  nList <- list()
-  for (i in 1:length(uniqueProduct)){
-    proName <- uniqueProduct[i]
-    datShipPro_i <- datShipPro[which(datShipPro$Product_Name == proName), ]
-    n_ship <- 0
-    #     for (j in 1:(length(x_split))){
-    for (j in 1:(length(x_split) - 1)){
-      xi <- x_split[j]
-      n_ship[j] <- sum(datShipPro_i[which(datShipPro_i$Shipping_DT == xi), "Qty"])
-      if (n_ship[j] < 0)n_ship[j] <- 0
+  n_ship <- matrix(n_ship, nrow=1)
+  nList[[i]] <- n_ship
+}
+x_mid <- sapply(1:length(x), function(i){
+  tmpd <- strsplit(x[i], "/")[[1]]
+  tmpd[3] <- "15"
+  paste(tmpd, collapse = "/")
+})
+for (l in 1:length(nList)){
+  #   colnames(nList[[l]]) <- x_mid[1:(length(x_mid) - 1)]
+  colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
+}
+names(nList) <- uniqueProduct
+
+# prob mapping function
+probMapping <- function(tpIni, tpEnd, index, ftab, uniTimePointWithZero){
+  if (tpIni %in% uniTimePointWithZero & tpEnd %in% uniTimePointWithZero){
+    row1 <- ftab[which(uniTimePointWithZero == tpIni), ]
+    row2 <- ftab[which(uniTimePointWithZero == tpEnd), ]
+    f1 <- row1[index]; f2 <- row2[index]
+    if (f1 == 0){
+      iniRow1 <- iniRow2 <- which(uniTimePointWithZero == tpIni)
+      while(ftab[iniRow1, index] == 0){
+        if (iniRow1 == 1)break
+        iniRow1 <- iniRow1 - 1
+      }
+      while(ftab[iniRow2, index] == 0){
+        if (iniRow2 == nrow(ftab))break
+        iniRow2 <- iniRow2 + 1
+      }
+      proportion <- (tpIni - uniTimePointWithZero[iniRow1])/(uniTimePointWithZero[iniRow2] - uniTimePointWithZero[iniRow1])
+      f1 <- ftab[iniRow1, index] + proportion*(ftab[iniRow2, index] - ftab[iniRow1, index])
     }
-    n_ship <- matrix(n_ship, nrow=1)
-    nList[[i]] <- n_ship
+    #-----
+    if (f2 == 0){
+      endRow1 <- endRow2 <- which(uniTimePointWithZero == tpEnd)
+      while(ftab[endRow1, index] == 0){
+        if (endRow1 == 1)break
+        endRow1 <- endRow1 - 1
+      }
+      while(ftab[endRow2, index] == 0){
+        if (endRow2 == nrow(ftab))break
+        endRow2 <- endRow2 + 1
+      }
+      proportion <- (tpEnd - uniTimePointWithZero[endRow1])/(uniTimePointWithZero[endRow2] - uniTimePointWithZero[endRow1])
+      f2 <- ftab[endRow1, index] + proportion*(ftab[endRow2, index] - ftab[endRow1, index])
+    }
+    
+    prob <- f2 - f1
+  }else{
+    if (length(which(uniTimePointWithZero <= tpIni)) == 0){
+      iniNear1 <- min(uniTimePointWithZero)
+    }else{
+      iniNear1 <- uniTimePointWithZero[max(which(uniTimePointWithZero <= tpIni))]  
+    }
+    
+    iniNear2 <- uniTimePointWithZero[min(which(uniTimePointWithZero > tpIni))]
+    #         f11 <- ftab[which(uniTimePoint == iniNear1), index]
+    #         f12 <- ftab[which(uniTimePoint == iniNear2), index]
+    f11 <- ftab[which(uniTimePointWithZero == iniNear1), index]
+    f12 <- ftab[which(uniTimePointWithZero == iniNear2), index]
+    
+    if (f11 == 0){
+      iniRow1 <- iniRow2 <- which(uniTimePointWithZero == iniNear1)
+      ###
+      while(ftab[iniRow1, index] == 0){
+        if (iniRow1 == 1)break
+        iniRow1 <- iniRow1 - 1
+      }
+      ###
+      while(ftab[iniRow2, index] == 0){
+        if (iniRow2 == nrow(ftab))break
+        iniRow2 <- iniRow2 + 1
+      }
+      proportion <- (iniNear1 - uniTimePointWithZero[iniRow1])/(uniTimePointWithZero[iniRow2] - uniTimePointWithZero[iniRow1])
+      f11 <- ftab[iniRow1, index] + proportion*(ftab[iniRow2, index] - ftab[iniRow1, index])
+    }
+    if (f12 == 0){
+      iniRow1 <- iniRow2 <- which(uniTimePointWithZero == iniNear2)
+      while(ftab[iniRow1, index] == 0){
+        if (iniRow1 == 1)break
+        iniRow1 <- iniRow1 - 1
+      }
+      while(ftab[iniRow2, index] == 0){
+        if (iniRow2 == nrow(ftab))break
+        iniRow2 <- iniRow2 + 1
+      }
+      proportion <- (iniNear2 - uniTimePointWithZero[iniRow1])/(uniTimePointWithZero[iniRow2] - uniTimePointWithZero[iniRow1])
+      f12 <- ftab[iniRow1, index] + proportion*(ftab[iniRow2, index] - ftab[iniRow1, index])
+    }      
+    
+    if (length(which(uniTimePointWithZero <= tpIni)) == 0){
+      proportion <- 1
+    }else{
+      proportion <- (tpIni - iniNear1)/(iniNear2 - iniNear1)
+    }
+    prob_tpIni <- f11 + proportion*(f12 - f11)
+    # -----
+    
+    if (length(which(uniTimePointWithZero <= tpIni)) == 0){
+      endNear1 <- min(uniTimePointWithZero)
+    }else{
+      endNear1 <- uniTimePointWithZero[max(which(uniTimePointWithZero < tpEnd))]
+    }
+    
+    endNear2 <- uniTimePointWithZero[min(which(uniTimePointWithZero > tpEnd))]
+    f21 <- ftab[which(uniTimePointWithZero == endNear1), index]
+    f22 <- ftab[which(uniTimePointWithZero == endNear2), index]
+    
+    if (f21 == 0){
+      endRow1 <- endRow2 <- which(uniTimePointWithZero == endNear1)
+      while(ftab[endRow1, index] == 0){
+        if (endRow1 == 1)break
+        endRow1 <- endRow1 - 1
+      }
+      while(ftab[endRow2, index] == 0){
+        if (endRow2 == nrow(ftab))break
+        endRow2 <- endRow2 + 1
+      }
+      proportion <- (endNear1 - uniTimePointWithZero[endRow1])/(uniTimePointWithZero[endRow2] - uniTimePointWithZero[endRow1])
+      f21 <- ftab[endRow1, index] + proportion*(ftab[endRow2, index] - ftab[endRow1, index])
+    }
+    if (f22 == 0){
+      endRow1 <- endRow2 <- which(uniTimePointWithZero == endNear2)
+      while(ftab[endRow1, index] == 0){
+        if (endRow1 == 1)break
+        endRow1 <- endRow1 - 1
+      }
+      while(ftab[endRow2, index] == 0){
+        if (endRow2 == nrow(ftab))break
+        endRow2 <- endRow2 + 1
+      }
+      proportion <- (endNear2 - uniTimePointWithZero[endRow1])/(uniTimePointWithZero[endRow2] - uniTimePointWithZero[endRow1])
+      f22 <- ftab[endRow1, index] + proportion*(ftab[endRow2, index] - ftab[endRow1, index])
+    }      
+    if (length(which(uniTimePointWithZero <= tpEnd)) == 0){
+      proportion <- 1
+    }else{
+      proportion <- (tpEnd - endNear1)/(endNear2 - endNear1)
+    }
+    
+    prob_tpEnd <- f21 + proportion*(f22 - f21)
+    prob <- prob_tpEnd - prob_tpIni
   }
+  return(prob)    
+}
+#
+
+for (number in 1:length(uniqueProduct)){
+  print(number/length(uniqueProduct))
+  n_ship <- nList[[number]]
+  proName <- uniqueProduct[number]
+  ##
+  ## ---- build the complete failuretable
+  ##
+  ## ---- for censored
+  lf_nonBroken <- as.numeric(strptime(endMonth, "%Y-%m-%d") - strptime(as.character(colnames(n_ship)), "%Y/%m/%d"))
+  dat_attr3 <- as.data.frame(cbind(lifeTime = lf_nonBroken, attribute = rep("3", length(lf_nonBroken))))
+  ## ---- dataComp_c includes all the data, it need to remove the Receive_DT after YMD.
+  dataComp_c_pro <- dataComp_c[which(dataComp_c$Product_Name == proName), ]
+  part <- which(strptime(x[length(x) - 1], "%Y/%m/%d") - strptime(dataComp_c_pro$Receive_DT, "%Y/%m/%d") > 0)
+  dataComp_c_part <- dataComp_c_pro[part, ]
+  dat_attr1 <- as.data.frame(cbind(lifeTime = dataComp_c_part$lifeTime, attribute = rep("1", length(dataComp_c_part$lifeTime))))
+
+
+  failureTable <- matrix(0, ncol = 7, nrow = (length(uniTimePoint) + 1))
   
-  x_mid <- sapply(1:length(x), function(i){
-    tmpd <- strsplit(x[i], "/")[[1]]
-    tmpd[3] <- "15"
-    paste(tmpd, collapse = "/")
-  })
-  for (l in 1:length(nList)){
-    colnames(nList[[l]]) <- x_mid[1:(length(x_mid) - 1)]
-    #     colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
-  }
-  names(nList) <- uniqueProduct
-  # ----- Make the table, 1st column is time point, 2nd column is attribute. 
-  # ----- 1. attribute = 1 means failure data
-  # ----- 2. attribute = 2 means censored data in failure sheet 
-  # ----- 3. attribute = 3 means censored data in dat_shipping (need to multiple the amount)
+}
+
+#
+#
+rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
+  endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
+  system.time(
   Est <- EstLower <- EstUpper <- 0
   EstM <- EstMw <- 0
+  system.time(
   for (num in 1:length(uniqueProduct)){
+    #     print(num/length(uniqueProduct))
     n_ship <- nList[[num]]
     proName <- uniqueProduct[num]
     ##
@@ -382,7 +540,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
       sti <- numeric(length = length(nonZero) + 1)
       sti[1] <- 1
       for (j in 2:(length(nonZero) + 1)){
-        print(j/(length(nonZero) + 1))
+        #         print(j/(length(nonZero) + 1))
         sti[j] <- sti[j - 1] * failureTable[which(rownames(failureTable) == names(nonZero[j - 1])), 4]
       }
       sti <- sti[-1]
@@ -412,7 +570,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     
     # ----- If the number of sacrificer are less, it may effect the estimation a lot.(failure probability will too high.)
     # ----- It still need discussion.
-    lastDiLargeN <- which(failureTable[, 3] > minNi & failureTable[, 1] > 0)
+    lastDiLargeN <- which(failureTable[, 3] >= minNi & failureTable[, 1] > 0)
     if (length(lastDiLargeN) != 0){
       for (j in 5:7){
         for (m in max(lastDiLargeN):nrow(failureTable)){
@@ -442,137 +600,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     ## probMapping is a function that can map a given timeRange(tpIni, tpEnd) to failureTable to get the probability.
     ##
     uniTimePointWithZero <- c(0, uniTimePoint)
-    probMapping <- function(tpIni, tpEnd, index, ftab){
-      if (tpIni %in% uniTimePointWithZero & tpEnd %in% uniTimePointWithZero){
-        row1 <- ftab[which(uniTimePointWithZero == tpIni), ]
-        row2 <- ftab[which(uniTimePointWithZero == tpEnd), ]
-        f1 <- row1[index]; f2 <- row2[index]
-        if (f1 == 0){
-          iniRow1 <- iniRow2 <- which(uniTimePointWithZero == tpIni)
-          while(ftab[iniRow1, index] == 0){
-            if (iniRow1 == 1)break
-            iniRow1 <- iniRow1 - 1
-          }
-          while(ftab[iniRow2, index] == 0){
-            if (iniRow2 == nrow(ftab))break
-            iniRow2 <- iniRow2 + 1
-          }
-          proportion <- (tpIni - uniTimePointWithZero[iniRow1])/(uniTimePointWithZero[iniRow2] - uniTimePointWithZero[iniRow1])
-          f1 <- ftab[iniRow1, index] + proportion*(ftab[iniRow2, index] - ftab[iniRow1, index])
-        }
-        #-----
-        if (f2 == 0){
-          endRow1 <- endRow2 <- which(uniTimePointWithZero == tpEnd)
-          while(ftab[endRow1, index] == 0){
-            if (endRow1 == 1)break
-            endRow1 <- endRow1 - 1
-          }
-          while(ftab[endRow2, index] == 0){
-            if (endRow2 == nrow(ftab))break
-            endRow2 <- endRow2 + 1
-          }
-          proportion <- (tpEnd - uniTimePointWithZero[endRow1])/(uniTimePointWithZero[endRow2] - uniTimePointWithZero[endRow1])
-          f2 <- ftab[endRow1, index] + proportion*(ftab[endRow2, index] - ftab[endRow1, index])
-        }
-        
-        prob <- f2 - f1
-      }else{
-        if (length(which(uniTimePointWithZero <= tpIni)) == 0){
-          iniNear1 <- min(uniTimePointWithZero)
-        }else{
-          iniNear1 <- uniTimePointWithZero[max(which(uniTimePointWithZero <= tpIni))]  
-        }
-        
-        iniNear2 <- uniTimePointWithZero[min(which(uniTimePointWithZero > tpIni))]
-        #         f11 <- ftab[which(uniTimePoint == iniNear1), index]
-        #         f12 <- ftab[which(uniTimePoint == iniNear2), index]
-        f11 <- ftab[which(uniTimePointWithZero == iniNear1), index]
-        f12 <- ftab[which(uniTimePointWithZero == iniNear2), index]
-        
-        if (f11 == 0){
-          iniRow1 <- iniRow2 <- which(uniTimePointWithZero == iniNear1)
-          ###
-          while(ftab[iniRow1, index] == 0){
-            if (iniRow1 == 1)break
-            iniRow1 <- iniRow1 - 1
-          }
-          ###
-          while(ftab[iniRow2, index] == 0){
-            if (iniRow2 == nrow(ftab))break
-            iniRow2 <- iniRow2 + 1
-          }
-          proportion <- (iniNear1 - uniTimePointWithZero[iniRow1])/(uniTimePointWithZero[iniRow2] - uniTimePointWithZero[iniRow1])
-          f11 <- ftab[iniRow1, index] + proportion*(ftab[iniRow2, index] - ftab[iniRow1, index])
-        }
-        if (f12 == 0){
-          iniRow1 <- iniRow2 <- which(uniTimePointWithZero == iniNear2)
-          while(ftab[iniRow1, index] == 0){
-            if (iniRow1 == 1)break
-            iniRow1 <- iniRow1 - 1
-          }
-          while(ftab[iniRow2, index] == 0){
-            if (iniRow2 == nrow(ftab))break
-            iniRow2 <- iniRow2 + 1
-          }
-          proportion <- (iniNear2 - uniTimePointWithZero[iniRow1])/(uniTimePointWithZero[iniRow2] - uniTimePointWithZero[iniRow1])
-          f12 <- ftab[iniRow1, index] + proportion*(ftab[iniRow2, index] - ftab[iniRow1, index])
-        }      
-        
-        if (length(which(uniTimePointWithZero <= tpIni)) == 0){
-          proportion <- 1
-        }else{
-          proportion <- (tpIni - iniNear1)/(iniNear2 - iniNear1)
-        }
-        prob_tpIni <- f11 + proportion*(f12 - f11)
-        # -----
-        
-        if (length(which(uniTimePointWithZero <= tpIni)) == 0){
-          endNear1 <- min(uniTimePointWithZero)
-        }else{
-          endNear1 <- uniTimePointWithZero[max(which(uniTimePointWithZero < tpEnd))]
-        }
-        
-        endNear2 <- uniTimePointWithZero[min(which(uniTimePointWithZero > tpEnd))]
-        f21 <- ftab[which(uniTimePointWithZero == endNear1), index]
-        f22 <- ftab[which(uniTimePointWithZero == endNear2), index]
-        
-        if (f21 == 0){
-          endRow1 <- endRow2 <- which(uniTimePointWithZero == endNear1)
-          while(ftab[endRow1, index] == 0){
-            if (endRow1 == 1)break
-            endRow1 <- endRow1 - 1
-          }
-          while(ftab[endRow2, index] == 0){
-            if (endRow2 == nrow(ftab))break
-            endRow2 <- endRow2 + 1
-          }
-          proportion <- (endNear1 - uniTimePointWithZero[endRow1])/(uniTimePointWithZero[endRow2] - uniTimePointWithZero[endRow1])
-          f21 <- ftab[endRow1, index] + proportion*(ftab[endRow2, index] - ftab[endRow1, index])
-        }
-        if (f22 == 0){
-          endRow1 <- endRow2 <- which(uniTimePointWithZero == endNear2)
-          while(ftab[endRow1, index] == 0){
-            if (endRow1 == 1)break
-            endRow1 <- endRow1 - 1
-          }
-          while(ftab[endRow2, index] == 0){
-            if (endRow2 == nrow(ftab))break
-            endRow2 <- endRow2 + 1
-          }
-          proportion <- (endNear2 - uniTimePointWithZero[endRow1])/(uniTimePointWithZero[endRow2] - uniTimePointWithZero[endRow1])
-          f22 <- ftab[endRow1, index] + proportion*(ftab[endRow2, index] - ftab[endRow1, index])
-        }      
-        if (length(which(uniTimePointWithZero <= tpEnd)) == 0){
-          proportion <- 1
-        }else{
-          proportion <- (tpEnd - endNear1)/(endNear2 - endNear1)
-        }
-        
-        prob_tpEnd <- f21 + proportion*(f22 - f21)
-        prob <- prob_tpEnd - prob_tpIni
-      }
-      return(prob)    
-    }
+    
     failureTableModified <- failureTable
     if (sum(failureTable[, 1] != 0) > 10){
       Y <- failureTableModified[which(failureTableModified[, 1] != 0), 5]
@@ -603,12 +631,12 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
       #
       probVector <- 0
       for (i in 1:(length(timePoint) - 1)){
-        probVector[i] <- probMapping(timePoint[i], timePoint[i + 1], 5, failureTable)
+        probVector[i] <- probMapping(timePoint[i], timePoint[i + 1], 5, failureTable, uniTimePointWithZero)
       }
       
       probVectorM <- 0
       for (i in 1:(length(timePoint) - 1)){
-        probVectorM[i] <- probMapping(timePoint[i], timePoint[i + 1], 5, failureTableModified)
+        probVectorM[i] <- probMapping(timePoint[i], timePoint[i + 1], 5, failureTableModified, uniTimePointWithZero)
       }
       #
       # ----- LowerBound
@@ -642,6 +670,232 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     estM <- sum((rev(n_ship)*probVectorM)[restrict], na.rm = T)
     EstM[num] <- estM
   }
+  )
+  )
+  
+  Est <- EstLower <- EstUpper <- 0
+  EstM <- EstMw <- 0
+  cl <- makeCluster(4, type="SOCK")
+  clusterExport(cl, list("nList", "probMapping", "uniqueProduct", "endMonth", "dataComp_c",
+                         "x", "dat_censored1", "alpha", "minNi",
+                         "Est", "EstLower", "EstUpper", "EstM", "EstMw", "YMD"), envir = .GlobalEnv)
+  system.time(
+    parSapply(cl, 1:length(uniqueProduct), function(num){
+      n_ship <- nList[[num]]
+      proName <- uniqueProduct[num]
+      ##
+      ## for censored 
+      ##
+      lf_nonBroken <- as.numeric(strptime(endMonth, "%Y-%m-%d") - strptime(as.character(colnames(n_ship)), "%Y/%m/%d"))
+      dat_attr3 <- as.data.frame(cbind(lifeTime = lf_nonBroken, attribute = rep("3", length(lf_nonBroken))))
+      ##
+      ## ---- dataComp_c includes all the data, it need to remove the Receive_DT after YMD.
+      ##
+      dataComp_c_pro <- dataComp_c[which(dataComp_c$Product_Name == proName), ]
+      part <- which(strptime(x[length(x) - 1], "%Y/%m/%d") - strptime(dataComp_c_pro$Receive_DT, "%Y/%m/%d") > 0)
+      dataComp_c_part <- dataComp_c_pro[part, ]
+      dat_attr1 <- as.data.frame(cbind(lifeTime = dataComp_c_part$lifeTime, attribute = rep("1", length(dataComp_c_part$lifeTime))))
+      ##
+      ##
+      censoredPro <- dat_censored1[which(dat_censored1$Product_Name == proName), ]
+      if (nrow(censoredPro) != 0){
+        lf_censored1 <- strptime(rep(YMD, nrow(censoredPro)), "%Y/%m/%d") - strptime(censoredPro$MES_Shipping_Dt_withDay, "%Y/%m/%d")
+        ##
+        ## ---- Because lf_censored1 is build before input the YMD, so it may include the shipping date after than the YMD, so the value will be negative.
+        ##
+        lf_censored1_part <- lf_censored1[which(lf_censored1 > 0)]
+        dat_attr2 <- as.data.frame(cbind(lifeTime = as.numeric(lf_censored1_part), attribute = rep("2", length(lf_censored1_part))))
+      }else{
+        dat_attr2 <- NULL
+      }
+      tmpTable <- rbind(dat_attr1, dat_attr2, dat_attr3)
+      tmpTable[, 1] <- as.numeric(as.character(tmpTable[, 1]))  
+      tmpTableOrder <- tmpTable[order(tmpTable[, 1]), ]
+      ind <- which(strptime(colnames(n_ship), "%Y/%m/%d") < strptime(endMonth, "%Y-%m-%d"))
+      n <- sum(n_ship[ind])
+      ##
+      ## ----- combine the same lifeTime and same attribute together
+      ##
+      uniTimePoint <- unique(tmpTableOrder[, 1])  
+      failureTable <- matrix(0, ncol = 7, nrow = (length(uniTimePoint) + 1))
+      failureTable[1, 3] <- n
+      
+      for (i in 2:(length(uniTimePoint) + 1)){
+        tab <- tmpTableOrder[which(tmpTableOrder[, 1] == uniTimePoint[i - 1]), ]
+        failureTable[i, 1] <- sum((tab[, 2] == 1))      # di
+        failureTable[i, 2] <- sum((tab[, 2] == 2))      # ri
+        
+        # attr == 3
+        if (3 %in% tab$attribute){
+          censorDate <- colnames(n_ship)[which(tab[which(tab[, 2] == 3), 1] == lf_nonBroken)]
+          dieBetween <- which(strptime(censorDate, format = "%Y/%m/%d") < strptime(dataComp_c_part$MES_Shipping_Dt_withDay, "%Y/%m/%d") & 
+                                strptime(dataComp_c_part$MES_Shipping_Dt_withDay, "%Y/%m/%d") < seq(from = strptime(censorDate, format = "%Y/%m/%d"), length = 2, by = "months")[2])
+          if (length(dieBetween) != 0){
+            qtyBetween <- sum(as.numeric(dataComp_c_part[dieBetween, "qty"]))
+            if (n_ship[which(colnames(n_ship) == censorDate)] != 0){
+              nShip_censore <- n_ship[which(colnames(n_ship) == censorDate)] - qtyBetween
+            }else{
+              nShip_censore <- 0
+            }
+            failureTable[i, 2] <- failureTable[i, 2] + nShip_censore     # ri (attr 3)
+          }
+        }
+        
+        failureTable[i, 3] <- failureTable[i - 1, 3] - sum(failureTable[i - 1, 1] + failureTable[i - 1, 2])    # ni
+      }
+      
+      rownames(failureTable) <- c(0, uniTimePoint)
+      colnames(failureTable) <- c("di", "ri", "ni", "1-pi", "F(ti)", "Lower", "Upper")
+      if (min(failureTable[, 3]) < 0){
+        failureTable[, 3] <- failureTable[, 3] - min(failureTable[, 3])
+      }
+      # -----
+      for (i in 1:nrow(failureTable)){
+        if (failureTable[i, 1] > 0 & failureTable[i, 3] > 0){
+          failureTable[i, 4] <- 1 - (failureTable[i, 1] / failureTable[i, 3])
+        }
+      }
+      
+      nonZero <- which(failureTable[, 1] != 0)
+      if (length(nonZero) == 0){
+        sti <- 0
+        fti <- 1
+      }else{
+        sti <- numeric(length = length(nonZero) + 1)
+        sti[1] <- 1
+        for (j in 2:(length(nonZero) + 1)){
+          #         print(j/(length(nonZero) + 1))
+          sti[j] <- sti[j - 1] * failureTable[which(rownames(failureTable) == names(nonZero[j - 1])), 4]
+        }
+        sti <- sti[-1]
+        fti <- 1 - sti
+      }
+      failureTable[which(failureTable[, 1] != 0), 5] <- fti
+      
+      nj <- failureTable[which(failureTable[, 1] != 0), 3]
+      p <- 1 - failureTable[which(failureTable[, 1] != 0), 4]
+      tmp1 <- p/(n*(1-p))
+      var_Fti  <- 0
+      for (i in 1:length(fti)){
+        var_Fti[i] <- (sti[i])^2*sum(tmp1[1:i])
+      }
+      z <- qnorm(1 - alpha)
+      # ----- 1. log transformation
+      w <- exp(z*sqrt(var_Fti)/(fti*(1 - fti)))
+      Fti_Lower <- fti/(fti + (1 - fti)*w)
+      Fti_Upper <- fti/(fti + (1 - fti)/w)
+      
+      # ----- 2. large sample (assume it is normal distribution)
+      #   Fti_Lower <- max(fti - z*sqrt(var_Fti), 0)
+      #   Fti_Upper <- min(fti + z*sqrt(var_Fti), 1)
+      failureTable[which(failureTable[, 1] != 0), 6] <- Fti_Lower
+      failureTable[which(failureTable[, 1] != 0), 7] <- Fti_Upper
+      failureTable[which(failureTable[, 4] == 0 & failureTable[, 1] > 0), 6:7] <- 1
+      
+      # ----- If the number of sacrificer are less, it may effect the estimation a lot.(failure probability will too high.)
+      # ----- It still need discussion.
+      lastDiLargeN <- which(failureTable[, 3] >= minNi & failureTable[, 1] > 0)
+      if (length(lastDiLargeN) != 0){
+        for (j in 5:7){
+          for (m in max(lastDiLargeN):nrow(failureTable)){
+            failureTable[m, j] <- failureTable[lastDiLargeN[length(lastDiLargeN)], j]
+          }
+        }
+        
+        ##
+        ## failureTable has only one di, so the F(ti) will be the same, it will let the prob all be zero.
+        ##
+        for (j in 5:7){
+          if (failureTable[1, 1] == 0){
+            if (length(which(failureTable[, j] > 0)) > 0){
+              for (r in 2:(min(lastDiLargeN) - 1)){
+                proportion <- c(0, uniTimePoint)[r]/(c(0, uniTimePoint)[min(lastDiLargeN)])
+                failureTable[r, 5] <- proportion*failureTable[min(lastDiLargeN), 5]
+              }
+            }
+          }
+        }
+      }
+      ## ----- Start to build the process of calculation 
+      ## unit: day
+      ## Add the currently ()
+      timePoint <- rev(c(strptime(endMonth, "%Y-%m-%d") - strptime(colnames(n_ship), "%Y/%m/%d"), 0))
+      ##
+      ## probMapping is a function that can map a given timeRange(tpIni, tpEnd) to failureTable to get the probability.
+      ##
+      uniTimePointWithZero <- c(0, uniTimePoint)
+      
+      failureTableModified <- failureTable
+      if (sum(failureTable[, 1] != 0) > 10){
+        Y <- failureTableModified[which(failureTableModified[, 1] != 0), 5]
+        X <- as.numeric(rownames(failureTableModified)[which(failureTableModified[, 1] != 0)])
+        #
+        # remove the max value
+        #
+        X <- X[-which(Y == max(Y))]
+        Y <- Y[-which(Y == max(Y))]
+        fit <- lm(Y ~ X)
+        #
+        # model:y = ax + b
+        #
+        a <- fit$coefficients[2]; b <- fit$coefficients[1]
+        #
+        # last di location 
+        #
+        lastDi <- max(which(failureTable[, 1] != 0))
+        fr <- a*uniTimePointWithZero[(lastDi+1):nrow(failureTable)] + b
+        failureTableModified[(lastDi+1):nrow(failureTable), 5] <- fr
+      }
+      
+      if (sum(failureTable[, 1] == 0) == nrow(failureTable)){
+        probVector <- probVectorM <- probVectorLower <- probVectorUpper <- rep(0, length(timePoint) - 1)
+      }else{
+        #
+        # ----- Estimation
+        #
+        probVector <- 0
+        for (i in 1:(length(timePoint) - 1)){
+          probVector[i] <- probMapping(timePoint[i], timePoint[i + 1], 5, failureTable, uniTimePointWithZero)
+        }
+        
+        probVectorM <- 0
+        for (i in 1:(length(timePoint) - 1)){
+          probVectorM[i] <- probMapping(timePoint[i], timePoint[i + 1], 5, failureTableModified, uniTimePointWithZero)
+        }
+        #
+        # ----- LowerBound
+        #
+        probVectorLower <- 0
+        for (i in 1:(length(timePoint) - 1)){
+          probVectorLower[i] <- 0
+        }
+        #
+        # ----- UpperBound
+        #
+        probVectorUpper <- 0
+        for (i in 1:(length(timePoint) - 1)){
+          probVectorUpper[i] <- 0
+        }
+      }
+      lenLimit <- length(which(probVector < 1))
+      est <- sum((rev(n_ship) * probVector)[1:lenLimit], na.rm = T)
+      estLower <- sum((rev(n_ship) * probVectorLower)[1:lenLimit], na.rm = T)
+      estUpper <- sum((rev(n_ship) * probVectorUpper)[1:lenLimit], na.rm = T)
+      
+      Est[num] <- est
+      EstLower[num] <- estLower
+      EstUpper[num] <- estUpper
+      #
+      # failure rate modified
+      #
+      timeDiff <- strptime(paste(YMD, "/01", sep = ""), "%Y/%m/%d") - strptime(rev(colnames(n_ship)), "%Y/%m/%d")
+      restrict <- which(timeDiff < 720)
+      
+      estM <- sum((rev(n_ship)*probVectorM)[restrict], na.rm = T)
+      EstM[num] <- estM
+    })
+  )
+  stopCluster(cl)
   return(list(Est, EstLower, EstUpper, EstM))
 }
 # ----- Selection mechanism
@@ -800,7 +1054,6 @@ selectNi <- function(dataM, YMD, maxNi = 5, currentDate){
   dataFrame <- cbind(dataFrame, EstTs = est.ts)
   return(dataFrame)
 }
-# ----- ggplot 
 
 #---------------------------------------------------------------------------
 #---------------------------------------------------------------------------
@@ -841,11 +1094,14 @@ componentName <- "14S4860600"
 unique(dat_com$PartNumber)[600:800]
 
 t1 = proc.time()
+
 tM1 <- proc.time()
 dataM <- dataArr(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
 tM2 <- proc.time()
 tM2 - tM1
+
 elected <- selectNi(dataM = dataM, YMD = ymd, maxNi = 1, currentDate = currentDate)
+
 t2 = proc.time()
 t2 - t1
 ##
