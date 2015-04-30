@@ -610,6 +610,16 @@ t2 <- proc.time()
 t2 - t1
 #
 #
+nonp <- apply(Est, 1, sum)
+plot(1:length(nonp), nonp, type = "l")
+lines(1:length(nonp), n_break)
+
+plot(1:length(nonp), apply(EstM, 1, sum), type = "l")
+lines(1:length(nonp), n_break)
+
+plot(1:length(nonp), apply(EstM, 1, sum), type = "l")
+lines(1:length(nonp), nonp)
+
 #
 #
 #
