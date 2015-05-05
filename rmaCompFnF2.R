@@ -372,73 +372,87 @@ probMapping <- function(tpIni, tpEnd, index, ftab, uniTimePointWithZero){
   }
   return(prob)    
 }
+# making nList (need: datShipPro, YMD, )
+datShipPro <- dataM[[3]]
+uniqueProduct <- as.character(unique(datShipPro$Product_Name))
+
+minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
+dataComp_c <- dataM[[2]]
+datShipPro <- dataM[[3]]
+dat_censored1 <- dataM[[4]]
+n_break <- dataM[[5]]
+
+endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
+x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
+                       as.Date(endMonth), "months"))
+
+x <- as.character(sapply(x1, function(y){
+  tmp <- strsplit(y, "-")[[1]]
+  tmp[3] <- "01"
+  tmp2 <- paste(tmp[1], tmp[2], tmp[3], sep="/")
+  return(tmp2)
+}))
+
+# ----- split the x so that it can match the dat_shipping (because dat_shipping only record the amount by month)
+x_split <- 0
+for (i in 1:length(x)){
+  tmp <- strsplit(x[i], "/")[[1]]
+  x_split[i] <- paste0(tmp[1], tmp[2])
+}
+x_mid <- sapply(1:length(x), function(i){
+  tmpd <- strsplit(x[i], "/")[[1]]
+  tmpd[3] <- "15"
+  paste(tmpd, collapse = "/")
+})
+nList <- lapply(1:length(uniqueProduct), function(i){
+  datShipPro_i <- datShipPro[which(datShipPro$Product_Name == uniqueProduct[i]), ]
+  n_ship <- sapply(1:(length(x_split) - 1), function(j){
+    return(max(sum(datShipPro_i[which(datShipPro_i$Shipping_DT == x_split[j]), "Qty"]), 0))
+  })
+  return(matrix(n_ship, nrow=1))
+})
+for (l in 1:length(nList)){
+  colnames(nList[[l]]) <- x_mid[1:(length(x_mid) - 1)]
+}
+names(nList) <- uniqueProduct
+
 # ----- Nonparametric Estimation
-rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
-  minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
-  dataComp_c <- dataM[[2]]
-  datShipPro <- dataM[[3]]
-  dat_censored1 <- dataM[[4]]
-  n_break <- dataM[[5]]
-  
-  endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
-  x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
-                         as.Date(endMonth), "months"))
-  
-  x <- as.character(sapply(x1, function(y){
-    tmp <- strsplit(y, "-")[[1]]
-    tmp[3] <- "01"
-    tmp2 <- paste(tmp[1], tmp[2], tmp[3], sep="/")
-    return(tmp2)
-  }))
-  
-  # ----- split the x so that it can match the dat_shipping (because dat_shipping only record the amount by month)
-  x_split <- 0
-  for (i in 1:length(x)){
-    tmp <- strsplit(x[i], "/")[[1]]
-    x_split[i] <- paste0(tmp[1], tmp[2])
-  }
-  
-  uniqueProduct <- as.character(unique(datShipPro$Product_Name))
-  
-  nList <- lapply(1:length(uniqueProduct), function(i){
-    datShipPro_i <- datShipPro[which(datShipPro$Product_Name == uniqueProduct[i]), ]
-    n_ship <- sapply(1:(length(x_split) - 1), function(j){
-      return(max(sum(datShipPro_i[which(datShipPro_i$Shipping_DT == x_split[j]), "Qty"]), 0))
-    })
-    return(matrix(n_ship, nrow=1))
-  })
-  
-  x_mid <- sapply(1:length(x), function(i){
-    tmpd <- strsplit(x[i], "/")[[1]]
-    tmpd[3] <- "15"
-    paste(tmpd, collapse = "/")
-  })
-  for (l in 1:length(nList)){
-    colnames(nList[[l]]) <- x_mid[1:(length(x_mid) - 1)]
-    #     colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
-  }
-  names(nList) <- uniqueProduct
+# add input: currentDate
+rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5, currentDate = currentDate){
   # ----- Make the table, 1st column is time point, 2nd column is attribute. 
   # ----- 1. attribute = 1 means failure data
   # ----- 2. attribute = 2 means censored data in failure sheet 
   # ----- 3. attribute = 3 means censored data in dat_shipping (need to multiple the amount)
+  cur <- paste(currentDate, "15", sep = "/")
+  nListCur <- lapply(1:length(uniqueProduct), function(c){
+    nList[[c]][1, 1:which(x_mid == cur)]
+  })
+  x_midCur <- x_mid[1:which(x_mid == cur)]
+  endCurrent <- seq(as.Date(paste(c(currentDate, "01"), collapse = "/")), length = 2, by = "months")[2]
   Est <- EstLower <- EstUpper <- 0
   EstM <- EstMw <- 0
   for (num in 1:length(uniqueProduct)){
-    n_ship <- nList[[num]]
+    n_ship <- nListCur[[num]]
     proName <- uniqueProduct[num]
     ##
     ## for censored 
     ##
-    lf_nonBroken <- as.numeric(strptime(endMonth, "%Y-%m-%d") - strptime(as.character(colnames(n_ship)), "%Y/%m/%d"))
+    lf_nonBroken <- as.numeric(strptime(endCurrent, "%Y-%m-%d") - strptime(x_midCur, "%Y/%m/%d"))
     dat_attr3 <- as.data.frame(cbind(lifeTime = lf_nonBroken, attribute = rep("3", length(lf_nonBroken))))
     ##
     ## ---- dataComp_c includes all the data, it need to remove the Receive_DT after YMD.
     ##
     dataComp_c_pro <- dataComp_c[which(dataComp_c$Product_Name == proName), ]
-    part <- which(strptime(x[length(x) - 1], "%Y/%m/%d") - strptime(dataComp_c_pro$Receive_DT, "%Y/%m/%d") > 0)
+    part <- which(strptime(endCurrent, "%Y-%m-%d") - strptime(dataComp_c_pro$Receive_DT, "%Y/%m/%d") > 0)
     dataComp_c_part <- dataComp_c_pro[part, ]
-    dat_attr1 <- as.data.frame(cbind(lifeTime = dataComp_c_part$lifeTime, attribute = rep("1", length(dataComp_c_part$lifeTime))))
+    lfBreak <- rep(dataComp_c_part$lifeTime, dataComp_c_part$qty)
+    dat_attr1 <- as.data.frame(cbind(lifeTime = lfBreak, attribute = rep("1", length(lfBreak))))
+    ## to know which month this product is broken
+    #     belongMonth <- strptime(endCurrent, "%Y-%m-%d") - strptime(dataComp_c_part$Receive_DT, "%Y/%m/%d")
+    #     belongLoc <- 0
+    #     for (i in 1:length(belongMonth)){
+    #       belongLoc[i] <- lf_nonBroken[max(which(belongMonth[i] < lf_nonBroken))]
+    #     }
     ##
     ##
     censoredPro <- dat_censored1[which(dat_censored1$Product_Name == proName), ]
@@ -455,7 +469,7 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     tmpTable <- rbind(dat_attr1, dat_attr2, dat_attr3)
     tmpTable[, 1] <- as.numeric(as.character(tmpTable[, 1]))  
     tmpTableOrder <- tmpTable[order(tmpTable[, 1]), ]
-    ind <- which(strptime(colnames(n_ship), "%Y/%m/%d") < strptime(endMonth, "%Y-%m-%d"))
+    ind <- which(strptime(x_mid, "%Y/%m/%d") < strptime(endCurrent, "%Y-%m-%d"))
     n <- sum(n_ship[ind])
     ##
     ## ----- combine the same lifeTime and same attribute together
@@ -463,31 +477,28 @@ rmaNonparametric <- function(YMD, dataM, alpha = 0.05, minNi = 5){
     uniTimePoint <- unique(tmpTableOrder[, 1])  
     failureTable <- matrix(0, ncol = 7, nrow = (length(uniTimePoint) + 1))
     failureTable[1, 3] <- n
-    
+    ########
+    ########
+    ########
     for (i in 2:(length(uniTimePoint) + 1)){
+    #for (i in 38:38){
       tab <- tmpTableOrder[which(tmpTableOrder[, 1] == uniTimePoint[i - 1]), ]
       failureTable[i, 1] <- sum((tab[, 2] == 1))      # di
-      failureTable[i, 2] <- sum((tab[, 2] == 2))      # ri
+      failureTable[i, 2] <- sum((tab[, 2] == 2))      # ri (in failure data)
       
       # attr == 3
       if (3 %in% tab$attribute){
-        censorDate <- colnames(n_ship)[which(tab[which(tab[, 2] == 3), 1] == lf_nonBroken)]
-        dieBetween <- which(strptime(censorDate, format = "%Y/%m/%d") < strptime(dataComp_c_part$MES_Shipping_Dt_withDay, "%Y/%m/%d") & 
-                              strptime(dataComp_c_part$MES_Shipping_Dt_withDay, "%Y/%m/%d") < seq(from = strptime(censorDate, format = "%Y/%m/%d"), length = 2, by = "months")[2])
-        if (length(dieBetween) != 0){
-          qtyBetween <- sum(as.numeric(dataComp_c_part[dieBetween, "qty"]))
-          if (n_ship[which(colnames(n_ship) == censorDate)] != 0){
-            nShip_censore <- n_ship[which(colnames(n_ship) == censorDate)] - qtyBetween
-          }else{
-            nShip_censore <- 0
-          }
-          failureTable[i, 2] <- failureTable[i, 2] + nShip_censore     # ri (attr 3)
-        }
+        locCensor <- which(lf_nonBroken == tab[1, 1])
+        nCensor <- n_ship[locCensor]
+        nCensor <- max(nCensor - length(which(belongLoc == tab[1, 1])), 0)
+        failureTable[i, 2] <- failureTable[i, 2] + n_ship[locCensor]     # ri (attr 3)
       }
       
       failureTable[i, 3] <- failureTable[i - 1, 3] - sum(failureTable[i - 1, 1] + failureTable[i - 1, 2])    # ni
     }
-    
+    ########
+    ########
+    ########
     rownames(failureTable) <- c(0, uniTimePoint)
     colnames(failureTable) <- c("di", "ri", "ni", "1-pi", "F(ti)", "Lower", "Upper")
     if (min(failureTable[, 3]) < 0){
@@ -801,8 +812,8 @@ selectNi <- function(dataM, YMD, maxNi = 5, currentDate){
 #---------------------------------------------------------------------------
 
 # input1: date
-currentDate <- "2015/4"
-ymd <- "2015/07" 
+currentDate <- "2015/04" # for simulation
+ymd <- "2015/07"        # for last estimation
 # input2: component name
 componentName <- "1400000907"
 componentName <- "1400004141"
