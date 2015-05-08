@@ -852,6 +852,8 @@ componentName <- "1124518191"
 componentName <- "1653000016"
 componentName <- "9680013278"
 componentName <- "14S4860600"
+partnumber <- unique(as.character(dat_com$PartNumber))
+componentName <- partnumber[32]
 
 t1 = proc.time()
 tM1 <- proc.time()
