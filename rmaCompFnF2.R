@@ -420,7 +420,8 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
   })
   x_midCur <- x_mid[1:which(x_mid == cur)]
   xCur <- x[1:which(x_mid == cur)]
-  endCurrent <- seq(as.Date(paste(c(currentDate, "01"), collapse = "/")), length = 2, by = "months")[2]
+  endtmp <- seq(as.Date(paste(c(currentDate, "01"), collapse = "/")), length = 2, by = "months")
+  endCurrent <- endtmp[2]
   Est <- EstLower <- EstUpper <- 0
   EstM <- EstMw <- 0
   for (num in 1:length(uniqueProduct)){
@@ -435,7 +436,7 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
     ## ---- dataComp_c includes all the data, it need to remove the Receive_DT after YMD.
     ##
     dataComp_c_pro <- dataComp_c[which(dataComp_c$Product_Name == proName), ]
-    part <- which(strptime(endCurrent, "%Y-%m-%d") - strptime(dataComp_c_pro$Receive_DT, "%Y/%m/%d") > 0)
+    part <- which(strptime(endtmp[1], "%Y-%m-%d") - strptime(dataComp_c_pro$Receive_DT, "%Y/%m/%d") > 0)
     dataComp_c_part <- dataComp_c_pro[part, ]
     if (nrow(dataComp_c_part) != 0){
       lfBreak <- rep(dataComp_c_part$lifeTime, dataComp_c_part$qty)
@@ -470,6 +471,7 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
       ## ----- combine the same lifeTime and same attribute together
       ##
       uniTimePoint <- unique(tmpTableOrder[, 1])  
+      if (uniTimePoint[1] == 0){uniTimePoint <- uniTimePoint[-1]}
       failureTable <- matrix(0, ncol = 7, nrow = (length(uniTimePoint) + 1))
       failureTable[1, 3] <- n
       ########
@@ -640,12 +642,16 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
         }
       }
       lenLimit <- length(which(probVector < 1))
-      est <- sum((rev(n_ship) * probVector)[1:lenLimit], na.rm = T)
-      estLower <- sum((rev(n_ship) * probVectorLower)[1:lenLimit], na.rm = T)
-      estUpper <- sum((rev(n_ship) * probVectorUpper)[1:lenLimit], na.rm = T)
-      #
-      timeDiff <- strptime(paste(currentDate, "/01", sep = ""), "%Y/%m/%d") - strptime(rev(colnames(n_ship)), "%Y/%m/%d")
+      #       timeDiff <- strptime(paste(currentDate, "/01", sep = ""), "%Y/%m/%d") - strptime(rev(x_midCur), "%Y/%m/%d")
+      timeDiff <- strptime(endtmp[2], "%Y-%m-%d") - strptime(rev(x_midCur), "%Y/%m/%d")
+      
       restrict <- which(timeDiff < 720)
+      
+      #       est <- sum((rev(n_ship) * probVector)[restrict][1:lenLimit], na.rm = T)
+      est <- sum((rev(n_ship) * probVector)[1:lenLimit], na.rm = T)
+      estLower <- sum((rev(n_ship) * probVectorLower)[restrict][1:lenLimit], na.rm = T)
+      estUpper <- sum((rev(n_ship) * probVectorUpper)[restrict][1:lenLimit], na.rm = T)
+      #
       estM <- sum((rev(n_ship)*probVectorM)[restrict], na.rm = T)
     }else{
       est = estLower = estUpper = estM = 0
@@ -662,7 +668,7 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
   return(list(Est, EstLower, EstUpper, EstM))
 }
 # ----- Selection mechanism
-selectNi <- function(dataM, YMD, minNi = 5, currentDate){
+selectNi <- function(dataM, YMD, minNi = 5){
   n_break <- dataM[[5]]
   minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
   
@@ -762,7 +768,8 @@ selectNi <- function(dataM, YMD, minNi = 5, currentDate){
   ind <- 30
   est.ts <- rep(0, nrow(dataFrame))
   est.ts[1:(ind - 1)] <- dataFrame[1:(ind - 1), "EstModified"]
-  current <- which(dataFrame[, 1] == currentDate)
+  #   current <- which(dataFrame[, 1] == currentDate)
+  current <- nrow(dataFrame)
   if (length(current) == 0){
     for (r in ind:nrow(dataFrame)){
       tmpTab <- dataFrame[1:(r - 1), ]
@@ -894,7 +901,7 @@ for (l in 1:length(nList)){
   colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
 }
 names(nList) <- uniqueProduct
-elected <- selectNi(dataM = dataM, YMD = ymd, minNi = 5, currentDate = currentDate)
+elected <- selectNi(dataM = dataM, YMD = ymd, minNi = 5)
 t2 = proc.time()
 t2 - t1
 ##
