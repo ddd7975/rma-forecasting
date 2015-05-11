@@ -34,9 +34,9 @@ colnames(dat_future_shipping) <- c("Shipping_DT", "Product_Name", "Qty")
 library(dplyr)
 # ------------------------------
 # ----- Data Arrangement
+dat_all[] <- lapply(dat_all, as.character)
+dat_com[] <- lapply(dat_com, as.character)
 dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = YMD){
-  dat_all[] <- lapply(dat_all, as.character)
-  dat_com[] <- lapply(dat_com, as.character)
   dat_com_i <- dat_com[which(dat_com$PartNumber == componentName), ] # decide a part number
   qty <- as.character(dat_com_i$Qty) 
   qty[which(qty == "")] <- 1 # if qty is blank, change it to 1
