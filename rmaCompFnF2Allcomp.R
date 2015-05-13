@@ -63,172 +63,175 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
   #
   #cl <- makeCluster(4, type="SOCK")
   #clusterExport(cl, list = c("dat_all_i", "dat_com_iPos"), envir=environment())
-  warranty_Type <- sapply(1:nrow(dat_all_i), function(i){
-    orderDT <- as.character(dat_all_i[i, "Order_DT"])
-    tmpOrder <- strsplit(orderDT, "\\/|\\:|\\-|\\ ")[[1]]
-    if (as.numeric(tmpOrder[1]) == max(suppressWarnings(as.numeric(tmpOrder)), na.rm = T)){
-      orderDate <- strptime(paste(tmpOrder[1:3], collapse = "/"), "%Y/%m/%d")
-    }else{
-      orderDate <- strptime(paste(tmpOrder[1:3], collapse = "/"), "%m/%d/%Y")
-    }
-    warrDT <- as.character(dat_all_i[i, "Warranty_DT"])
-    tmpWarr <- strsplit(warrDT, "\\/|\\:|\\-|\\ ")[[1]]
-    if (as.numeric(tmpWarr[1]) == max(suppressWarnings(as.numeric(tmpWarr)), na.rm = T)){
-      warrantyDate <- strptime(paste(tmpWarr[1:3], collapse = "/"), "%Y/%m/%d")
-    }else{
-      warrantyDate <- strptime(paste(tmpWarr[1:3], collapse = "/"), "%m/%d/%Y")
-    }
-    if (orderDate < warrantyDate){
-      return("In")
-    }else{
-      return("Out")
-    }
-  })
-  
-  ###--- need to speed up 
-  belongQty <- sapply(1:nrow(dat_all_i), function(i){
-    r <- dat_all_i[i, ]
-    dattmp <- dat_com_iPos[which(dat_com_iPos$Order_No == r$Order_No & dat_com_iPos$Item_No == r$item_No), ]
-    
-    if (nrow(dattmp) != 0){
-      if (nrow(dattmp) == 1){
-        return(dattmp$Qty)
+  if (nrow(dat_all_i) != 0){
+    warranty_Type <- sapply(1:nrow(dat_all_i), function(i){
+      orderDT <- as.character(dat_all_i[i, "Order_DT"])
+      tmpOrder <- strsplit(orderDT, "\\/|\\:|\\-|\\ ")[[1]]
+      if (as.numeric(tmpOrder[1]) == max(suppressWarnings(as.numeric(tmpOrder)), na.rm = T)){
+        orderDate <- strptime(paste(tmpOrder[1:3], collapse = "/"), "%Y/%m/%d")
       }else{
-        return(sum(as.numeric(dattmp$Qty)))
+        orderDate <- strptime(paste(tmpOrder[1:3], collapse = "/"), "%m/%d/%Y")
       }
-    }else{
-      return(NA)
+      warrDT <- as.character(dat_all_i[i, "Warranty_DT"])
+      tmpWarr <- strsplit(warrDT, "\\/|\\:|\\-|\\ ")[[1]]
+      if (as.numeric(tmpWarr[1]) == max(suppressWarnings(as.numeric(tmpWarr)), na.rm = T)){
+        warrantyDate <- strptime(paste(tmpWarr[1:3], collapse = "/"), "%Y/%m/%d")
+      }else{
+        warrantyDate <- strptime(paste(tmpWarr[1:3], collapse = "/"), "%m/%d/%Y")
+      }
+      if (orderDate < warrantyDate){
+        return("In")
+      }else{
+        return("Out")
+      }
+    })
+    
+    ###--- need to speed up 
+    belongQty <- sapply(1:nrow(dat_all_i), function(i){
+      r <- dat_all_i[i, ]
+      dattmp <- dat_com_iPos[which(dat_com_iPos$Order_No == r$Order_No & dat_com_iPos$Item_No == r$item_No), ]
+      
+      if (nrow(dattmp) != 0){
+        if (nrow(dattmp) == 1){
+          return(dattmp$Qty)
+        }else{
+          return(sum(as.numeric(dattmp$Qty)))
+        }
+      }else{
+        return(NA)
+      }
+    })
+    dataComp <- cbind(dat_all_i[which(!is.na(belongQty)), ], qty = belongQty[!is.na(belongQty)], warrantyType = warranty_Type[!is.na(belongQty)])
+    #############################################
+    ##                                         ##
+    ## 將warranty的日資料加上MES_Shipping_DT上 ##
+    ##                                         ##  
+    #############################################
+    warranty_ch <- as.character(dataComp$Warranty_DT)
+    MES_ch <- as.character(dataComp$MES_Shipping_DT)
+    w_day <- 0 
+    for (i in 1:length(warranty_ch)){
+      tmp <- suppressWarnings(as.numeric(strsplit(warranty_ch[i], "\\/|\\-|:| ")[[1]]))
+      if (length(tmp) == 6){tmp <- tmp[1:3]}
+      if (max(tmp, na.rm=T) == tmp[1]){
+        w_day[i] = tmp[3]
+        month <- tmp[2]
+      }else{
+        w_day[i] = tmp[2]
+        month <- tmp[1]
+      }
+      if (w_day[i] == 31){w_day[i] <- 30}
+      if (w_day[i] == 0){w_day[i] <- 15}
+      if (as.numeric(month) == 2){w_day[i] <- 27}
     }
-  })
-  dataComp <- cbind(dat_all_i[which(!is.na(belongQty)), ], qty = belongQty[!is.na(belongQty)], warrantyType = warranty_Type[!is.na(belongQty)])
-  #############################################
-  ##                                         ##
-  ## 將warranty的日資料加上MES_Shipping_DT上 ##
-  ##                                         ##  
-  #############################################
-  warranty_ch <- as.character(dataComp$Warranty_DT)
-  MES_ch <- as.character(dataComp$MES_Shipping_DT)
-  w_day <- 0 
-  for (i in 1:length(warranty_ch)){
-    tmp <- suppressWarnings(as.numeric(strsplit(warranty_ch[i], "\\/|\\-|:| ")[[1]]))
-    if (length(tmp) == 6){tmp <- tmp[1:3]}
-    if (max(tmp, na.rm=T) == tmp[1]){
-      w_day[i] = tmp[3]
-      month <- tmp[2]
-    }else{
-      w_day[i] = tmp[2]
-      month <- tmp[1]
+    
+    MES_ch_withDay <- sapply(1:length(MES_ch), function(i)paste(MES_ch[i], w_day[i], sep="/"))
+    #   MES_ch_withDay <- 0
+    #   for (i in 1:length(MES_ch)){
+    #     MES_ch_withDay[i] <- paste(MES_ch[i], w_day[i], sep="/")
+    #   }
+    
+    MES_ch_withDay <- sapply(1:length(MES_ch), function(i)MES_ch_withDay[i] <- paste(MES_ch[i], w_day[i], sep="/"))
+    shipDT <- MES_ch_withDay[MES_ch_withDay != ""]
+    msh <- as.character(min(as.Date(shipDT), na.rm = T))
+    minShip <- paste(strsplit(msh, split = "-")[[1]], collapse = "/")
+    tmp1 <- strsplit(minShip, "/")[[1]]
+    minY <- as.numeric(tmp1[1]); minM <- as.numeric(tmp1[2]); minD <- as.numeric(tmp1[3])
+    if (minD >= 25){
+      minD <- 24
     }
-    if (w_day[i] == 31){w_day[i] <- 30}
-    if (w_day[i] == 0){w_day[i] <- 15}
-    if (as.numeric(month) == 2){w_day[i] <- 27}
-  }
-  
-  MES_ch_withDay <- sapply(1:length(MES_ch), function(i)paste(MES_ch[i], w_day[i], sep="/"))
-  #   MES_ch_withDay <- 0
-  #   for (i in 1:length(MES_ch)){
-  #     MES_ch_withDay[i] <- paste(MES_ch[i], w_day[i], sep="/")
-  #   }
-  
-  MES_ch_withDay <- sapply(1:length(MES_ch), function(i)MES_ch_withDay[i] <- paste(MES_ch[i], w_day[i], sep="/"))
-  shipDT <- MES_ch_withDay[MES_ch_withDay != ""]
-  msh <- as.character(min(as.Date(shipDT), na.rm = T))
-  minShip <- paste(strsplit(msh, split = "-")[[1]], collapse = "/")
-  tmp1 <- strsplit(minShip, "/")[[1]]
-  minY <- as.numeric(tmp1[1]); minM <- as.numeric(tmp1[2]); minD <- as.numeric(tmp1[3])
-  if (minD >= 25){
-    minD <- 24
-  }
-  
-  time1 <- strptime(as.character(dataComp$Receive_DT), "%Y/%m/%d") # Receive date (the date that receiving the product from customer)
-  time2 <- strptime(as.character(MES_ch_withDay), "%Y/%m/%d") # Shipping date (send the product at beginning)
-  #----- if MES_ch_withDay has NA, then remove.
-  if (length(which(is.na(time2))) != 0){
-    time1 <- time1[-which(is.na(time2))]
-    dataComp <- dataComp[-which(is.na(time2)), ]
-    MES_ch_withDay <- MES_ch_withDay[-which(is.na(time2))]
-    time2 <- time2[-which(is.na(time2))]
-  }
-  lf <- sapply(1:length(time1), function(i)time1[i] - time2[i])
-  
-  dat_tmp <- cbind(dataComp, lifeTime = as.numeric(lf), MES_Shipping_Dt_withDay = MES_ch_withDay) 
-  tempdel <- which(dat_tmp$lifeTime < 0 | is.na(lf))
-  if (length(tempdel) != 0){
-    dataComp_c <- dat_tmp[-tempdel, ]
+    
+    time1 <- strptime(as.character(dataComp$Receive_DT), "%Y/%m/%d") # Receive date (the date that receiving the product from customer)
+    time2 <- strptime(as.character(MES_ch_withDay), "%Y/%m/%d") # Shipping date (send the product at beginning)
+    #----- if MES_ch_withDay has NA, then remove.
+    if (length(which(is.na(time2))) != 0){
+      time1 <- time1[-which(is.na(time2))]
+      dataComp <- dataComp[-which(is.na(time2)), ]
+      MES_ch_withDay <- MES_ch_withDay[-which(is.na(time2))]
+      time2 <- time2[-which(is.na(time2))]
+    }
+    lf <- sapply(1:length(time1), function(i)time1[i] - time2[i])
+    
+    dat_tmp <- cbind(dataComp, lifeTime = as.numeric(lf), MES_Shipping_Dt_withDay = MES_ch_withDay) 
+    tempdel <- which(dat_tmp$lifeTime < 0 | is.na(lf))
+    if (length(tempdel) != 0){
+      dataComp_c <- dat_tmp[-tempdel, ]
+    }else{
+      dataComp_c <- dat_tmp
+    }
+    lf_p <- lf[-tempdel] # life time positive
+    time2_s <- as.character(time2[-tempdel]) # time1 send (exclude the wierd value)
+    dat_censored1 <- dat_tmp[which(is.na(lf)), ] # Has shipping date, no receive date
+    # -----
+    # -----
+    # -----
+    endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
+    x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
+                           as.Date(endMonth), "months"))
+    x <- as.character(sapply(x1, function(y){
+      tmp <- strsplit(y, "-")[[1]]
+      tmp[3] <- "01"
+      tmp2 <- paste(tmp[1], tmp[2], tmp[3], sep="/")
+      return(tmp2)
+    }))
+    if (minD != 1){
+      x <- c(x, YMD)
+    }
+    #
+    # remove data which is "out of warranty".
+    #
+    outOfWarranty <- which(dataComp_c[, "warrantyType"] == "Out")
+    if (length(outOfWarranty) != 0){
+      dataOOW <- dataComp_c[-outOfWarranty, ]  
+    }else{
+      dataOOW <- dataComp_c
+    }
+    
+    # ----- n_break
+    receiveDt_timeform <- as.numeric(strptime(dataOOW$Receive_DT, "%Y/%m/%d"))
+    numeric.qty <- as.numeric(dataOOW$qty)
+    CountReturn <- function(time1, time2, dat){
+      tmp <- which(time1 <= receiveDt_timeform & 
+                     receiveDt_timeform < time2)
+      if (length(tmp) != 0){
+        n <- sum(numeric.qty[tmp])
+      }else{
+        n <- 0
+      }
+      return(n)
+    }
+    x_timeForm <- as.numeric(strptime(x[-length(x)], "%Y/%m/%d"))
+    n_break <- 0
+    for (i in 1:(length(x_timeForm))){
+      n_break[i] <- CountReturn(x_timeForm[i], x_timeForm[i + 1], dataOOW)
+    }
+    n_break <- matrix(n_break, nrow=1)
+    colnames(n_break) <- x[1:(length(x) - 1)]
+    
+    #-----
+    compBelongProduct <- as.character(unique(dataComp_c$Product_Name))
+    datShipProBefore <- dat_shipping[which(dat_shipping$Product_Name %in% compBelongProduct), 1:3]
+    
+    futureShipProIndex <- which(dat_future_shipping$Product_Name %in% compBelongProduct)
+    if (length(futureShipProIndex) != 0){
+      datShipPro <- rbind(datShipProBefore, dat_future_shipping[futureShipProIndex, ])
+    }else{
+      datShipPro <- datShipProBefore
+    }
+    
+    #---- method 2: moving average
+    estEmpirical <- 0
+    for (i in 1:length(n_break)){
+      if(i < 4){
+        estEmpirical[i] <- 0
+      }else{
+        estEmpirical[i] <- mean(c(n_break[i - 1], n_break[i - 2], n_break[i - 3]))
+      }
+    }
+    return(list(c(minY, minM, minD), dataComp_c, datShipPro, dat_censored1, n_break, estEmpirical))
   }else{
-    dataComp_c <- dat_tmp
+    return (NULL)
   }
-  lf_p <- lf[-tempdel] # life time positive
-  time2_s <- as.character(time2[-tempdel]) # time1 send (exclude the wierd value)
-  dat_censored1 <- dat_tmp[which(is.na(lf)), ] # Has shipping date, no receive date
-  # -----
-  # -----
-  # -----
-  endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
-  x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
-                         as.Date(endMonth), "months"))
-  x <- as.character(sapply(x1, function(y){
-    tmp <- strsplit(y, "-")[[1]]
-    tmp[3] <- "01"
-    tmp2 <- paste(tmp[1], tmp[2], tmp[3], sep="/")
-    return(tmp2)
-  }))
-  if (minD != 1){
-    x <- c(x, YMD)
-  }
-  #
-  # remove data which is "out of warranty".
-  #
-  outOfWarranty <- which(dataComp_c[, "warrantyType"] == "Out")
-  if (length(outOfWarranty) != 0){
-    dataOFW <- dataComp_c[-outOfWarranty, ]  
-  }else{
-    dataOFW <- dataComp_c
-  }
-  
-  # ----- n_break
-  receiveDt_timeform <- as.numeric(strptime(dataOFW$Receive_DT, "%Y/%m/%d"))
-  numeric.qty <- as.numeric(dataOFW$qty)
-  CountReturn <- function(time1, time2, dat){
-    tmp <- which(time1 <= receiveDt_timeform & 
-                   receiveDt_timeform < time2)
-    if (length(tmp) != 0){
-      n <- sum(numeric.qty[tmp])
-    }else{
-      n <- 0
-    }
-    return(n)
-  }
-  x_timeForm <- as.numeric(strptime(x[-length(x)], "%Y/%m/%d"))
-  n_break <- 0
-  for (i in 1:(length(x_timeForm))){
-    n_break[i] <- CountReturn(x_timeForm[i], x_timeForm[i + 1], dataOFW)
-  }
-  n_break <- matrix(n_break, nrow=1)
-  colnames(n_break) <- x[1:(length(x) - 1)]
-  
-  #-----
-  compBelongProduct <- as.character(unique(dataComp_c$Product_Name))
-  datShipProBefore <- dat_shipping[which(dat_shipping$Product_Name %in% compBelongProduct), 1:3]
-  
-  futureShipProIndex <- which(dat_future_shipping$Product_Name %in% compBelongProduct)
-  if (length(futureShipProIndex) != 0){
-    datShipPro <- rbind(datShipProBefore, dat_future_shipping[futureShipProIndex, ])
-  }else{
-    datShipPro <- datShipProBefore
-  }
-  
-  #---- method 2: moving average
-  estEmpirical <- 0
-  for (i in 1:length(n_break)){
-    if(i < 4){
-      estEmpirical[i] <- 0
-    }else{
-      estEmpirical[i] <- mean(c(n_break[i - 1], n_break[i - 2], n_break[i - 3]))
-    }
-  }
-  
-  return(list(c(minY, minM, minD), dataComp_c, datShipPro, dat_censored1, n_break, estEmpirical))
 }
 #
 # probility mapping function
@@ -438,7 +441,7 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
     dataComp_c_pro <- dataComp_c[which(dataComp_c$Product_Name == proName), ]
     part <- which(strptime(endtmp[1], "%Y-%m-%d") - strptime(dataComp_c_pro$Receive_DT, "%Y/%m/%d") > 0)
     dataComp_c_part <- dataComp_c_pro[part, ]
-    if (nrow(dataComp_c_part) != 0){
+    if (nrow(dataComp_c_part) >= 3){
       lfBreak <- rep(dataComp_c_part$lifeTime, dataComp_c_part$qty)
       dat_attr1 <- as.data.frame(cbind(lifeTime = lfBreak, attribute = rep("1", length(lfBreak))))
       # to know which month this product is broken
@@ -647,12 +650,12 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
       #       timeDiff <- strptime(paste(currentDate, "/01", sep = ""), "%Y/%m/%d") - strptime(rev(x_midCur), "%Y/%m/%d")
       timeDiff <- strptime(endtmp[2], "%Y-%m-%d") - strptime(rev(x_midCur), "%Y/%m/%d")
       
-      restrict <- which(timeDiff < 720)
+      restrict <- which(timeDiff < 900)
       
       #       est <- sum((rev(n_ship) * probVector)[restrict][1:lenLimit], na.rm = T)
-      est <- sum((rev(n_ship) * probVector)[1:lenLimit], na.rm = T)
-      estLower <- sum((rev(n_ship) * probVectorLower)[restrict][1:lenLimit], na.rm = T)
-      estUpper <- sum((rev(n_ship) * probVectorUpper)[restrict][1:lenLimit], na.rm = T)
+      est <- sum((rev(n_ship) * probVector)[1:lenLimit][restrict], na.rm = T)
+      estLower <- sum((rev(n_ship) * probVectorLower)[1:lenLimit][restrict], na.rm = T)
+      estUpper <- sum((rev(n_ship) * probVectorUpper)[1:lenLimit][restrict], na.rm = T)
       #
       estM <- sum((rev(n_ship)*probVectorM)[restrict], na.rm = T)
     }else{
@@ -769,25 +772,12 @@ selectNi <- function(dataM, YMD, minNi = 5){
   ## ind is set as 30, because the frequency in time series is set as 12, it need at least 2 period.
   ind <- 30
   est.ts <- rep(0, nrow(dataFrame))
-  est.ts[1:(ind - 1)] <- dataFrame[1:(ind - 1), "EstModified"]
-  #   current <- which(dataFrame[, 1] == currentDate)
-  current <- nrow(dataFrame)
-  if (length(current) == 0){
-    for (r in ind:nrow(dataFrame)){
-      tmpTab <- dataFrame[1:(r - 1), ]
-      endD <- as.character(tmpTab[(r - 1), 1])
-      enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
-      breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
-      fitB <- stl(breakTS, s.window="period")
-      estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
-      fitE <- stl(estTS, s.window="period")  
-      diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
-      dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
-      est.ts[r] <- dataFrame[r, "EstModified"] - dValue
-    }
-  }else{
-    for (r in ind:nrow(dataFrame)){
-      if (r <= current){
+  if (nrow(dataFrame) >= ind){
+    est.ts[1:(ind - 1)] <- dataFrame[1:(ind - 1), "EstModified"]
+    #   current <- which(dataFrame[, 1] == currentDate)
+    current <- nrow(dataFrame)
+    if (length(current) == 0){
+      for (r in ind:nrow(dataFrame)){
         tmpTab <- dataFrame[1:(r - 1), ]
         endD <- as.character(tmpTab[(r - 1), 1])
         enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
@@ -798,17 +788,32 @@ selectNi <- function(dataM, YMD, minNi = 5){
         diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
         dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
         est.ts[r] <- dataFrame[r, "EstModified"] - dValue
-      }else{
-        tmpTab <- dataFrame[1:current, ]
-        endD <- as.character(tmpTab[current, 1])
-        enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
-        breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
-        fitB <- stl(breakTS, s.window="period")
-        estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
-        fitE <- stl(estTS, s.window="period")  
-        diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
-        dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
-        est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+      }
+    }else{
+      for (r in ind:nrow(dataFrame)){
+        if (r <= current){
+          tmpTab <- dataFrame[1:(r - 1), ]
+          endD <- as.character(tmpTab[(r - 1), 1])
+          enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
+          breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+          fitB <- stl(breakTS, s.window="period")
+          estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+          fitE <- stl(estTS, s.window="period")  
+          diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
+          dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
+          est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+        }else{
+          tmpTab <- dataFrame[1:current, ]
+          endD <- as.character(tmpTab[current, 1])
+          enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
+          breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+          fitB <- stl(breakTS, s.window="period")
+          estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+          fitE <- stl(estTS, s.window="period")  
+          diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
+          dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
+          est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+        }
       }
     }
   }
@@ -857,55 +862,87 @@ componentName <- "14S4860600"
 partnumber <- unique(as.character(dat_com$PartNumber))
 componentName <- partnumber[32]
 
+
+listfile <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\git-respository\\rma-forecasting\\rmaInventoryList.csv", header = TRUE)
+compName <- as.character(listfile[, 1])
+nonAppearIndex <- which(compName %in% dat_com$PartNumber)
+compNameAppear <- compName[nonAppearIndex]
+
+pro = 16   # have problems (resolved)
+pro = 1700 # ok
+pro = 1750 # no
+pro = 1805 # have problems, time consuming
+pro = 1754 # small data
+pro = 1748 # have problems (resolved)
+pro = 1766 # ok
+pro = 1833 # strange!! problems (resolved)
+pro = 1820 # time consuming (resolved)
+pro = 1799 # have problems (resolved)
+pro = 1771 # small data
+pro = 114 # 
+
 t1 = proc.time()
-tM1 <- proc.time()
-dataM <- dataArr(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
-tM2 <- proc.time()
-tM2 - tM1
-datShipPro <- dataM[[3]]
-uniqueProduct <- as.character(unique(datShipPro$Product_Name))
-#
-minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
-dataComp_c <- dataM[[2]]
-datShipPro <- dataM[[3]]
-dat_censored1 <- dataM[[4]]
-n_break <- dataM[[5]]
-
-YMD <- ymd
-endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
-x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
-                       as.Date(endMonth), "months"))
-
-x <- as.character(sapply(x1, function(y){
-  tmp <- strsplit(y, "-")[[1]]
-  tmp[3] <- "01"
-  tmp2 <- paste(tmp[1], tmp[2], tmp[3], sep="/")
-  return(tmp2)
-}))
-
-# ----- split the x so that it can match the dat_shipping (because dat_shipping only record the amount by month)
-x_split <- 0
-for (i in 1:length(x)){
-  tmp <- strsplit(x[i], "/")[[1]]
-  x_split[i] <- paste0(tmp[1], tmp[2])
+for (pro in 1:length(compNameAppear)){
+  print(pro/length(compNameAppear))
+  print(paste(pro, length(compNameAppear), sep = "/"))
+  componentName <- compNameAppear[pro]
+  tM1 <- proc.time()
+  dataM <- dataArr(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
+  tM2 <- proc.time()
+  tM2 - tM1
+  if (!is.null(dataM)){
+    datShipPro <- dataM[[3]]
+    if (nrow(datShipPro) != 0){
+      uniqueProduct <- as.character(unique(datShipPro$Product_Name))
+      #
+      minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
+      dataComp_c <- dataM[[2]]
+      datShipPro <- dataM[[3]]
+      dat_censored1 <- dataM[[4]]
+      n_break <- dataM[[5]]
+      
+      YMD <- ymd
+      endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
+      x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
+                             as.Date(endMonth), "months"))
+      
+      x <- as.character(sapply(x1, function(y){
+        tmp <- strsplit(y, "-")[[1]]
+        tmp[3] <- "01"
+        tmp2 <- paste(tmp[1], tmp[2], tmp[3], sep="/")
+        return(tmp2)
+      }))
+      
+      # ----- split the x so that it can match the dat_shipping (because dat_shipping only record the amount by month)
+      x_split <- 0
+      for (i in 1:length(x)){
+        tmp <- strsplit(x[i], "/")[[1]]
+        x_split[i] <- paste0(tmp[1], tmp[2])
+      }
+      x_mid <- sapply(1:length(x), function(i){
+        tmpd <- strsplit(x[i], "/")[[1]]
+        tmpd[3] <- "15"
+        paste(tmpd, collapse = "/")
+      })
+      nList <- lapply(1:length(uniqueProduct), function(i){
+        datShipPro_i <- datShipPro[which(datShipPro$Product_Name == uniqueProduct[i]), ]
+        n_ship <- sapply(1:(length(x_split)), function(j){
+          return(max(sum(datShipPro_i[which(datShipPro_i$Shipping_DT == x_split[j]), "Qty"]), 0))
+        })
+        return(matrix(n_ship, nrow=1))
+      })
+      for (l in 1:length(nList)){
+        colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
+      }
+      names(nList) <- uniqueProduct
+      elected <- selectNi(dataM = dataM, YMD = ymd, minNi = 5)
+    }else{
+      elected <- matrix(0, ncol = 7, nrow = 0)
+    }
+  }else{
+    elected <- matrix(0, ncol = 7, nrow = 0)
+  }
 }
-x_mid <- sapply(1:length(x), function(i){
-  tmpd <- strsplit(x[i], "/")[[1]]
-  tmpd[3] <- "15"
-  paste(tmpd, collapse = "/")
-})
-nList <- lapply(1:length(uniqueProduct), function(i){
-  datShipPro_i <- datShipPro[which(datShipPro$Product_Name == uniqueProduct[i]), ]
-  n_ship <- sapply(1:(length(x_split)), function(j){
-    return(max(sum(datShipPro_i[which(datShipPro_i$Shipping_DT == x_split[j]), "Qty"]), 0))
-  })
-  return(matrix(n_ship, nrow=1))
-})
-for (l in 1:length(nList)){
-  colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
-}
-names(nList) <- uniqueProduct
-elected <- selectNi(dataM = dataM, YMD = ymd, minNi = 5)
 t2 = proc.time()
 t2 - t1
 ##
@@ -962,3 +999,4 @@ sum(cumulatedNon < 0)/length(cumulatedNon)
 sum(cumulatedMVTrend < 0)/length(cumulatedMVTrend)
 sum(cumulatedM < 0)/length(cumulatedM)
 sum(cumulatedTs < 0)/length(cumulatedTs)
+
