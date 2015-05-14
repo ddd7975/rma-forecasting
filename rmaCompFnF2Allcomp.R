@@ -13,7 +13,7 @@ dat_com <- sqlQuery(conn, "SELECT [Order_No]
                     ,[Qty]
                     FROM [SBA].[dbo].[eRMA_Consumption_All]")
 
-dat_shipping <- sqlQuery(conn, "SELECT [Shipping_DT], [Product_Name], [Qty]
+dat_shipping <- sqlQuery(conn, "SELECT [Shipping_DT], [Product_Name], [Qty], [Location]
                          FROM [SBA].[dbo].[EAI_Shipping]")
 
 save(dat_all, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
@@ -25,6 +25,7 @@ load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_shipping.RData")
 
+dat_all <- dat_all[-which(dat_all$Warranty_DT == "12:00:00 AM"), ]
 # ----- prediction of future (by month)
 dat_future_shipping <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\futureNshippingTest.csv", 
                                 header = TRUE)
@@ -32,6 +33,7 @@ colnames(dat_future_shipping) <- c("Shipping_DT", "Product_Name", "Qty")
 # ------------------------------
 # ------------------------------
 library(dplyr)
+library(compiler)
 # ------------------------------
 # ----- Data Arrangement
 dat_all[] <- lapply(dat_all, as.character)
@@ -233,6 +235,7 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
     return (NULL)
   }
 }
+dataArrC <- cmpfun(dataArr)
 #
 # probility mapping function
 probMapping <- function(tpIni, tpEnd, index, ftab, uniTimePointWithZero){
@@ -366,7 +369,7 @@ probMapping <- function(tpIni, tpEnd, index, ftab, uniTimePointWithZero){
   }
   return(prob)    
 }
-
+probMappingC <- cmpfun(probMapping)
 # making nList (need: datShipPro, YMD, )
 datShipPro <- dataM[[3]]
 uniqueProduct <- as.character(unique(datShipPro$Product_Name))
@@ -427,7 +430,7 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
   endCurrent <- endtmp[2]
   Est <- EstLower <- EstUpper <- 0
   EstM <- EstMw <- 0
-  for (num in 1:length(uniqueProduct)){
+  outtab <- sapply(1:length(uniqueProduct), function(num){
     n_ship <- nListCur[[num]]
     proName <- uniqueProduct[num]
     ##
@@ -661,16 +664,262 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
     }else{
       est = estLower = estUpper = estM = 0
     }
-    Est[num] <- est
-    EstLower[num] <- estLower
-    EstUpper[num] <- estUpper
-    #
-    # failure rate modified
-    #
-    EstM[num] <- estM
-    
-  }
-  return(list(Est, EstLower, EstUpper, EstM))
+    return(c(est, estLower, estUpper, estM))
+  })
+  return(outtab)
+}
+rmaNonparametricC <- function(currentDate = currentDate, dataM, alpha = 0.05, minNi = 5){
+  # ----- Make the table, 1st column is time point, 2nd column is attribute. 
+  # ----- 1. attribute = 1 means failure data
+  # ----- 2. attribute = 2 means censored data in failure sheet 
+  # ----- 3. attribute = 3 means censored data in dat_shipping (need to multiple the amount)
+  cur <- paste(currentDate, "15", sep = "/")
+  nListCur <- lapply(1:length(uniqueProduct), function(u){
+    nList[[u]][1, 1:which(x_mid == cur)]
+  })
+  x_midCur <- x_mid[1:which(x_mid == cur)]
+  xCur <- x[1:which(x_mid == cur)]
+  endtmp <- seq(as.Date(paste(c(currentDate, "01"), collapse = "/")), length = 2, by = "months")
+  endCurrent <- endtmp[2]
+  Est <- EstLower <- EstUpper <- 0
+  EstM <- EstMw <- 0
+  outtab <- sapply(1:length(uniqueProduct), function(num){
+    n_ship <- nListCur[[num]]
+    proName <- uniqueProduct[num]
+    ##
+    ## for censored 
+    ##
+    lf_nonBroken <- as.numeric(strptime(endCurrent, "%Y-%m-%d") - strptime(x_midCur, "%Y/%m/%d"))
+    dat_attr3 <- as.data.frame(cbind(lifeTime = lf_nonBroken, attribute = rep("3", length(lf_nonBroken))))
+    ##
+    ## ---- dataComp_c includes all the data, it need to remove the Receive_DT after YMD.
+    ##
+    dataComp_c_pro <- dataComp_c[which(dataComp_c$Product_Name == proName), ]
+    part <- which(strptime(endtmp[1], "%Y-%m-%d") - strptime(dataComp_c_pro$Receive_DT, "%Y/%m/%d") > 0)
+    dataComp_c_part <- dataComp_c_pro[part, ]
+    if (nrow(dataComp_c_part) >= 3){
+      lfBreak <- rep(dataComp_c_part$lifeTime, dataComp_c_part$qty)
+      dat_attr1 <- as.data.frame(cbind(lifeTime = lfBreak, attribute = rep("1", length(lfBreak))))
+      # to know which month this product is broken
+      lf_Month <- strptime(endCurrent, "%Y-%m-%d") - strptime(paste(xCur, "01", sep = "/"), "%Y/%m/%d")
+      belongMonth <- strptime(endCurrent, "%Y-%m-%d") - strptime(dataComp_c_part$MES_Shipping_Dt_withDay, "%Y/%m/%d")
+      belongTime <- 0
+      if (length(belongMonth) != 0){
+        for (i in 1:length(belongMonth)){
+          belongTime[i] <- lf_nonBroken[max(which(belongMonth[i] <= lf_Month))]
+        }
+      }
+      #
+      censoredPro <- dat_censored1[which(dat_censored1$Product_Name == proName), ]
+      if (nrow(censoredPro) != 0){
+        lf_censored1 <- strptime(rep(currentDate, nrow(censoredPro)), "%Y/%m/%d") - strptime(censoredPro$MES_Shipping_Dt_withDay, "%Y/%m/%d")
+        ##
+        ## ---- Because lf_censored1 is build before input the YMD, so it may include the shipping date after than the YMD, so the value will be negative.
+        ##
+        lf_censored1_part <- lf_censored1[which(lf_censored1 > 0)]
+        dat_attr2 <- as.data.frame(cbind(lifeTime = as.numeric(lf_censored1_part), attribute = rep("2", length(lf_censored1_part))))
+      }else{
+        dat_attr2 <- NULL
+      }
+      tmpTable <- rbind(dat_attr1, dat_attr2, dat_attr3)
+      tmpTable[, 1] <- as.numeric(as.character(tmpTable[, 1]))  
+      tmpTableOrder <- tmpTable[order(tmpTable[, 1]), ]
+      ind <- which(strptime(x_mid, "%Y/%m/%d") < strptime(endCurrent, "%Y-%m-%d"))
+      n <- sum(n_ship[ind])
+      ##
+      ## ----- combine the same lifeTime and same attribute together
+      ##
+      uniTimePoint <- unique(tmpTableOrder[, 1])  
+      if (uniTimePoint[1] == 0){uniTimePoint <- uniTimePoint[-1]}
+      failureTable <- matrix(0, ncol = 7, nrow = (length(uniTimePoint) + 1))
+      failureTable[1, 3] <- n
+      ########
+      ########
+      ########
+      for (i in 2:(length(uniTimePoint) + 1)){
+        #for (i in 38:38){
+        tab <- tmpTableOrder[which(tmpTableOrder[, 1] == uniTimePoint[i - 1]), ]
+        failureTable[i, 1] <- sum((tab[, 2] == 1))      # di
+        failureTable[i, 2] <- sum((tab[, 2] == 2))      # ri (in failure data)
+        
+        # attr == 3
+        if (3 %in% tab$attribute){
+          locCensor <- which(lf_nonBroken == tab[1, 1])
+          nCensor <- n_ship[locCensor]
+          failureTable[i, 2] <- failureTable[i, 2] + nCensor     # ri (attr 3)
+        }
+      }
+      rownames(failureTable) <- c(0, uniTimePoint)
+      colnames(failureTable) <- c("di", "ri", "ni", "1-pi", "F(ti)", "Lower", "Upper")
+      
+      for (l in 1:length(belongTime)){
+        loc <- which(belongTime[l] == c(0, uniTimePoint))
+        tmp[l] <- loc
+        failureTable[loc, 2] <- failureTable[loc, 2] - 1
+      }
+      
+      if (min(failureTable[, 2]) < 0){
+        failureTable[1, 3] <- failureTable[1, 3] - sum(failureTable[which(failureTable[, 2] < 0), 2])
+        failureTable[which(failureTable[, 2] < 0), 2] <- 0
+      }
+      
+      for (i in 2:(length(uniTimePoint) + 1)){
+        failureTable[i, 3] <- failureTable[i - 1, 3] - sum(failureTable[i - 1, 1] + failureTable[i - 1, 2])    # ni  
+      }
+      
+      ########
+      ########
+      ########
+      if (min(failureTable[, 3]) < 0){
+        failureTable[, 3] <- failureTable[, 3] - min(failureTable[, 3])
+      }
+      # -----
+      for (i in 1:nrow(failureTable)){
+        if (failureTable[i, 1] > 0 & failureTable[i, 3] > 0){
+          failureTable[i, 4] <- 1 - (failureTable[i, 1] / failureTable[i, 3])
+        }
+      }
+      
+      nonZero <- which(failureTable[, 1] != 0)
+      if (length(nonZero) == 0){
+        sti <- 0
+        fti <- 1
+      }else{
+        sti <- numeric(length = length(nonZero) + 1)
+        sti[1] <- 1
+        for (j in 2:(length(nonZero) + 1)){
+          sti[j] <- sti[j - 1] * failureTable[which(rownames(failureTable) == names(nonZero[j - 1])), 4]
+        }
+        sti <- sti[-1]
+        fti <- 1 - sti
+      }
+      failureTable[which(failureTable[, 1] != 0), 5] <- fti
+      
+      nj <- failureTable[which(failureTable[, 1] != 0), 3]
+      p <- 1 - failureTable[which(failureTable[, 1] != 0), 4]
+      tmp1 <- p/(n*(1-p))
+      var_Fti  <- 0
+      for (i in 1:length(fti)){
+        var_Fti[i] <- (sti[i])^2*sum(tmp1[1:i])
+      }
+      z <- qnorm(1 - alpha)
+      # ----- 1. log transformation
+      w <- exp(z*sqrt(var_Fti)/(fti*(1 - fti)))
+      Fti_Lower <- fti/(fti + (1 - fti)*w)
+      Fti_Upper <- fti/(fti + (1 - fti)/w)
+      
+      # ----- 2. large sample (assume it is normal distribution)
+      #   Fti_Lower <- max(fti - z*sqrt(var_Fti), 0)
+      #   Fti_Upper <- min(fti + z*sqrt(var_Fti), 1)
+      failureTable[which(failureTable[, 1] != 0), 6] <- Fti_Lower
+      failureTable[which(failureTable[, 1] != 0), 7] <- Fti_Upper
+      failureTable[which(failureTable[, 4] == 0 & failureTable[, 1] > 0), 6:7] <- 1
+      
+      # ----- If the number of sacrificer are less, it may effect the estimation a lot.(failure probability will too high.)
+      # ----- It still need discussion.
+      lastDiLargeN <- which(failureTable[, 3] > minNi & failureTable[, 1] > 0)
+      if (length(lastDiLargeN) != 0){
+        for (j in 5:7){
+          for (m in max(lastDiLargeN):nrow(failureTable)){
+            failureTable[m, j] <- failureTable[lastDiLargeN[length(lastDiLargeN)], j]
+          }
+        }
+        
+        ##
+        ## failureTable has only one di, so the F(ti) will be the same, it will let the prob all be zero.
+        ##
+        for (j in 5:7){
+          if (failureTable[1, 1] == 0){
+            if (length(which(failureTable[, j] > 0)) > 0){
+              for (r in 2:(min(lastDiLargeN) - 1)){
+                proportion <- c(0, uniTimePoint)[r]/(c(0, uniTimePoint)[min(lastDiLargeN)])
+                failureTable[r, 5] <- proportion*failureTable[min(lastDiLargeN), 5]
+              }
+            }
+          }
+        }
+      }
+      ## ----- Start to build the process of calculation 
+      ## unit: day
+      ## Add the currently ()
+      timePoint <- rev(c(strptime(endMonth, "%Y-%m-%d") - strptime(colnames(n_ship), "%Y/%m/%d"), 0))
+      ##
+      ## probMapping is a function that can map a given timeRange(tpIni, tpEnd) to failureTable to get the probability.
+      ##
+      uniTimePointWithZero <- c(0, uniTimePoint)
+      timePoint <- c(0, rev(lf_nonBroken))
+      failureTableModified <- failureTable
+      if (sum(failureTable[, 1] != 0) > 10){
+        Y <- failureTableModified[which(failureTableModified[, 1] != 0), 5]
+        X <- as.numeric(rownames(failureTableModified)[which(failureTableModified[, 1] != 0)])
+        #
+        # remove the max value
+        #
+        X <- X[-which(Y == max(Y))]
+        Y <- Y[-which(Y == max(Y))]
+        fit <- lm(Y ~ X)
+        #
+        # model:y = ax + b
+        #
+        a <- fit$coefficients[2]; b <- fit$coefficients[1]
+        #
+        # last di location 
+        #
+        lastDi <- max(which(failureTable[, 1] != 0))
+        if (lastDi != nrow(failureTable)){
+          fr <- a*uniTimePointWithZero[(lastDi+1):nrow(failureTable)] + b
+          failureTableModified[(lastDi+1):nrow(failureTable), 5] <- fr
+        }
+      }
+      
+      if (sum(failureTable[, 1] == 0) == nrow(failureTable)){
+        probVector <- probVectorM <- probVectorLower <- probVectorUpper <- rep(0, length(timePoint) - 1)
+      }else{
+        #
+        # ----- Estimation
+        #
+        probVector <- 0
+        for (i in 1:(length(timePoint) - 1)){
+          probVector[i] <- probMappingC(timePoint[i], timePoint[i + 1], 5, failureTable, uniTimePointWithZero)
+        }
+        
+        probVectorM <- 0
+        for (i in 1:(length(timePoint) - 1)){
+          probVectorM[i] <- probMappingC(timePoint[i], timePoint[i + 1], 5, failureTableModified, uniTimePointWithZero)
+        }
+        #
+        # ----- LowerBound
+        #
+        probVectorLower <- 0
+        for (i in 1:(length(timePoint) - 1)){
+          probVectorLower[i] <- 0
+        }
+        #
+        # ----- UpperBound
+        #
+        probVectorUpper <- 0
+        for (i in 1:(length(timePoint) - 1)){
+          probVectorUpper[i] <- 0
+        }
+      }
+      lenLimit <- length(which(probVector < 1))
+      #       timeDiff <- strptime(paste(currentDate, "/01", sep = ""), "%Y/%m/%d") - strptime(rev(x_midCur), "%Y/%m/%d")
+      timeDiff <- strptime(endtmp[2], "%Y-%m-%d") - strptime(rev(x_midCur), "%Y/%m/%d")
+      
+      restrict <- which(timeDiff < 900)
+      
+      #       est <- sum((rev(n_ship) * probVector)[restrict][1:lenLimit], na.rm = T)
+      est <- sum((rev(n_ship) * probVector)[1:lenLimit][restrict], na.rm = T)
+      estLower <- sum((rev(n_ship) * probVectorLower)[1:lenLimit][restrict], na.rm = T)
+      estUpper <- sum((rev(n_ship) * probVectorUpper)[1:lenLimit][restrict], na.rm = T)
+      #
+      estM <- sum((rev(n_ship)*probVectorM)[restrict], na.rm = T)
+    }else{
+      est = estLower = estUpper = estM = 0
+    }
+    return(c(est, estLower, estUpper, estM))
+  })
+  return(outtab)
 }
 # ----- Selection mechanism
 selectNi <- function(dataM, YMD, minNi = 5){
@@ -703,13 +952,14 @@ selectNi <- function(dataM, YMD, minNi = 5){
     twoPeriod <- 24
   }
   
+  
   for (i in 2:twoPeriod){
-    tmpStore <- rmaNonparametric(xDate[i], dataM, minNi = minNi)
-    tmpEst[i] <- sum(tmpStore[[1]])
-    tmpLower[i] <- sum(tmpStore[[2]])
-    tmpUpper[i] <- sum(tmpStore[[3]])
-    tmpTrendmv[i] <- sum(tmpStore[[1]])
-    tmpEstM[i] <- sum(tmpStore[[4]])
+    tmpStore <- apply(rmaNonparametric(xDate[i], dataM, minNi = minNi), 1, sum)
+    tmpEst[i] <- tmpStore[1]
+    tmpLower[i] <- tmpStore[2]
+    tmpUpper[i] <- tmpStore[3]
+    tmpTrendmv[i] <- tmpStore[1]
+    tmpEstM[i] <- tmpStore[4]
     
     if (i > 10){
       mean1 <- mean(n_break[(i - 1):(i - 5)])
@@ -726,20 +976,17 @@ selectNi <- function(dataM, YMD, minNi = 5){
       ftMean <- mean(c(ft1, ft2, ft3, ft4))
       tmpTrendmv[i] <- mean(c(mean1 + ftMean,  sum(tmpStore[[1]])))
     }
-    
   }
   
   if (length(xDate) > 24){
     for (i in 25:length(xDate)){
-      tmpStore <- rmaNonparametric(xDate[i], dataM, minNi = minNi)
-      tmpEst[i] <- sum(tmpStore[[1]])
-      tmpEstM[i] <- sum(tmpStore[[4]])
-      
-      tmpLower[i] <- sum(tmpStore[[2]])
-      tmpUpper[i] <- sum(tmpStore[[3]])
-      
-      #-----
-      tmpTrendmv[i] <- sum(tmpStore[[1]])
+      tmpStore <- apply(rmaNonparametric(xDate[i], dataM, minNi = minNi), 1, sum)
+      tmpEst[i] <- tmpStore[1]
+      tmpLower[i] <- tmpStore[2]
+      tmpUpper[i] <- tmpStore[3]
+      tmpTrendmv[i] <- tmpStore[1]
+      tmpEstM[i] <- tmpStore[4]
+      #
       mean1 <- mean(n_break[(i - 1):(i - 5)])
       mean2 <- mean(n_break[(i - 2):(i - 6)])
       mean3 <- mean(n_break[(i - 3):(i - 7)])
@@ -772,6 +1019,7 @@ selectNi <- function(dataM, YMD, minNi = 5){
   ## ind is set as 30, because the frequency in time series is set as 12, it need at least 2 period.
   ind <- 30
   est.ts <- rep(0, nrow(dataFrame))
+  numOfTraceback <- 2
   if (nrow(dataFrame) >= ind){
     est.ts[1:(ind - 1)] <- dataFrame[1:(ind - 1), "EstModified"]
     #   current <- which(dataFrame[, 1] == currentDate)
@@ -786,7 +1034,7 @@ selectNi <- function(dataM, YMD, minNi = 5){
         estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
         fitE <- stl(estTS, s.window="period")  
         diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
-        dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
+        dValue <- mean(diffValue[(length(diffValue) - numOfTraceback):length(diffValue)])
         est.ts[r] <- dataFrame[r, "EstModified"] - dValue
       }
     }else{
@@ -800,7 +1048,7 @@ selectNi <- function(dataM, YMD, minNi = 5){
           estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
           fitE <- stl(estTS, s.window="period")  
           diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
-          dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
+          dValue <- mean(diffValue[(length(diffValue) - numOfTraceback):length(diffValue)])
           est.ts[r] <- dataFrame[r, "EstModified"] - dValue
         }else{
           tmpTab <- dataFrame[1:current, ]
@@ -811,7 +1059,7 @@ selectNi <- function(dataM, YMD, minNi = 5){
           estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
           fitE <- stl(estTS, s.window="period")  
           diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
-          dValue <- mean(diffValue[(length(diffValue) - 1):length(diffValue)])
+          dValue <- mean(diffValue[(length(diffValue) - numOfTraceback):length(diffValue)])
           est.ts[r] <- dataFrame[r, "EstModified"] - dValue
         }
       }
@@ -823,6 +1071,154 @@ selectNi <- function(dataM, YMD, minNi = 5){
   dataFrame <- cbind(dataFrame, EstTs = est.ts)
   return(dataFrame)
 }
+selectNi2 <- function(dataM, YMD, minNi = 5){
+  n_break <- dataM[[5]]
+  minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
+  
+  endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
+  x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
+                         as.Date(endMonth), "months"))
+  x <- as.character(sapply(x1, function(y){
+    tmp <- strsplit(y, "-")[[1]]
+    tmp2 <- paste(tmp[1], tmp[2], sep="/")
+    return(tmp2)
+  }))
+  if (minD != 1){
+    x <- c(x, YMD)
+  }
+  xDate <- x[1:length(x) - 1]
+  
+  #----- selection mechanism
+  tmpEst <- 0
+  tmpLower <- 0
+  tmpUpper <- 0
+  tmpTrendmv <- 0
+  tmpEstM <- 0
+  
+  if (length(xDate) < 25){
+    twoPeriod <- length(xDate)
+  }else{
+    twoPeriod <- 24
+  }
+  
+  
+  for (i in 2:twoPeriod){
+    tmpStore <- apply(rmaNonparametricC(xDate[i], dataM, minNi = minNi), 1, sum)
+    tmpEst[i] <- tmpStore[1]
+    tmpLower[i] <- tmpStore[2]
+    tmpUpper[i] <- tmpStore[3]
+    tmpTrendmv[i] <- tmpStore[1]
+    tmpEstM[i] <- tmpStore[4]
+    
+    if (i > 10){
+      mean1 <- mean(n_break[(i - 1):(i - 5)])
+      mean2 <- mean(n_break[(i - 2):(i - 6)])
+      mean3 <- mean(n_break[(i - 3):(i - 7)])
+      mean4 <- mean(n_break[(i - 4):(i - 8)])
+      mean5 <- mean(n_break[(i - 5):(i - 9)])
+      #-------------------
+      
+      ft1 <- mean2 - mean1
+      ft2 <- mean3 - mean2
+      ft3 <- mean4 - mean3
+      ft4 <- mean5 - mean4
+      ftMean <- mean(c(ft1, ft2, ft3, ft4))
+      tmpTrendmv[i] <- mean(c(mean1 + ftMean,  sum(tmpStore[[1]])))
+    }
+  }
+  
+  if (length(xDate) > 24){
+    for (i in 25:length(xDate)){
+      tmpStore <- apply(rmaNonparametricC(xDate[i], dataM, minNi = minNi), 1, sum)
+      tmpEst[i] <- tmpStore[1]
+      tmpLower[i] <- tmpStore[2]
+      tmpUpper[i] <- tmpStore[3]
+      tmpTrendmv[i] <- tmpStore[1]
+      tmpEstM[i] <- tmpStore[4]
+      #
+      mean1 <- mean(n_break[(i - 1):(i - 5)])
+      mean2 <- mean(n_break[(i - 2):(i - 6)])
+      mean3 <- mean(n_break[(i - 3):(i - 7)])
+      mean4 <- mean(n_break[(i - 4):(i - 8)])
+      mean5 <- mean(n_break[(i - 5):(i - 9)])
+      
+      ft1 <- mean2 - mean1
+      ft2 <- mean3 - mean2
+      ft3 <- mean4 - mean3
+      ft4 <- mean5 - mean4
+      ftMean <- mean(c(ft1, ft2, ft3, ft4))
+      tmpTrendmv[i] <- mean(c(mean1 + ftMean,  sum(tmpStore[[1]])))
+    }
+  }
+  
+  EstStorage <- matrix(c(tmpEst, tmpLower, tmpUpper, tmpTrendmv, tmpEstM), ncol = 5)
+  
+  # -----
+  #   Est <- EstStorage[, 1]
+  #   Lower <- EstStorage[, 2]
+  #   Upper <- EstStorage[, 3]
+  #   MVTrend <- EstStorage[, 4]
+  #   EstModified <- EstStorage[, 5]
+  nb <- c(as.numeric(n_break))
+  dataFrame <- data.frame(x = xDate, nb = nb, Est = tmpEst, Lower = tmpLower, Upper = tmpUpper, 
+                          MVTrend = tmpTrendmv, EstModified = tmpEstM, Empirical = dataM[[6]])
+  ## use time series to let the estimation close to the truth.
+  ## ind is set as 30, because the frequency in time series is set as 12, it need at least 2 period.
+  ind <- 30
+  est.ts <- rep(0, nrow(dataFrame))
+  numOfTraceback <- 2
+  if (nrow(dataFrame) >= ind){
+    est.ts[1:(ind - 1)] <- dataFrame[1:(ind - 1), "EstModified"]
+    #   current <- which(dataFrame[, 1] == currentDate)
+    current <- nrow(dataFrame)
+    if (length(current) == 0){
+      for (r in ind:nrow(dataFrame)){
+        tmpTab <- dataFrame[1:(r - 1), ]
+        endD <- as.character(tmpTab[(r - 1), 1])
+        enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
+        breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+        fitB <- stl(breakTS, s.window="period")
+        estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+        fitE <- stl(estTS, s.window="period")  
+        diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
+        dValue <- mean(diffValue[(length(diffValue) - numOfTraceback):length(diffValue)])
+        est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+      }
+    }else{
+      for (r in ind:nrow(dataFrame)){
+        if (r <= current){
+          tmpTab <- dataFrame[1:(r - 1), ]
+          endD <- as.character(tmpTab[(r - 1), 1])
+          enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
+          breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+          fitB <- stl(breakTS, s.window="period")
+          estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+          fitE <- stl(estTS, s.window="period")  
+          diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
+          dValue <- mean(diffValue[(length(diffValue) - numOfTraceback):length(diffValue)])
+          est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+        }else{
+          tmpTab <- dataFrame[1:current, ]
+          endD <- as.character(tmpTab[current, 1])
+          enddate <- as.numeric(strsplit(endD[length(endD)], "/")[[1]])
+          breakTS <- ts(tmpTab[, "nb"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+          fitB <- stl(breakTS, s.window="period")
+          estTS <- ts(tmpTab[, "EstModified"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+          fitE <- stl(estTS, s.window="period")  
+          diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
+          dValue <- mean(diffValue[(length(diffValue) - numOfTraceback):length(diffValue)])
+          est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+        }
+      }
+    }
+  }
+  
+  neg <- which(est.ts < 0)
+  if (length(neg) > 0){est.ts[neg] <- 0}
+  dataFrame <- cbind(dataFrame, EstTs = est.ts)
+  return(dataFrame)
+}
+selectNiC <- cmpfun(selectNi2)
 #---------------------------------------------------------------------------
 #---------------------------------------------------------------------------
 #---------------------------------------------------------------------------
@@ -832,37 +1228,6 @@ selectNi <- function(dataM, YMD, minNi = 5){
 currentDate <- "2015/07" # for simulation
 ymd <- "2015/07"        # for last estimation
 # input2: component name
-componentName <- "1400000907"
-componentName <- "1400004141"
-componentName <- "1410022431"
-componentName <- "AIMB-210G2-S6A1E" # not bad! golden is better!
-componentName <- "PCM-3375F-L0A1E" # not bad! golden is better!
-componentName <- "SQF-P10S2-4G-ETE" # not good...under estimate
-componentName <- "AIMB-762G2-00A1E" # need to take some time
-componentName <- "96DR-512M333NN-AP2" # time consuming
-componentName <- "PCA-6006LV-00B1" # ni = 65, failure rate too high... not good
-componentName <- "PCM-9375F-J0A1E" # red and golden are all over estimate 
-componentName <- "PCA-6003V-00A2E" # under estimate, no much difference between red and golden, take some time
-componentName <- "96MI-3OP-P2-AV" # amount too small
-componentName <- "PCA-6187VE-00A2E"
-componentName <- "1410006740" # can't judge which one is better, cum of gold will get up in the end
-componentName <- "9698967103E" # golden's est is good, a little bit underestimate
-componentName <- "PPC-102S-BARE-T" # n_break is zero...(remove DOA and out of warranty), golden est is zero!
-componentName <- "IPC-610P4-250-E" # n_break is zero...(remove DOA and out of warranty), golden est is zero!
-componentName <- "1701440159"
-componentName <- "XZFR-S-5158" # data too narrow
-componentName <- "1330000985"
-componentName <- "96VG-256M-P-SP"
-componentName <- "PCI-1721-AE" # too small
-componentName <- "96HD750G-ST-SG7K" # too small
-componentName <- "1124518191"
-componentName <- "1653000016"
-componentName <- "9680013278"
-componentName <- "14S4860600"
-partnumber <- unique(as.character(dat_com$PartNumber))
-componentName <- partnumber[32]
-
-
 listfile <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\git-respository\\rma-forecasting\\rmaInventoryList.csv", header = TRUE)
 compName <- as.character(listfile[, 1])
 nonAppearIndex <- which(compName %in% dat_com$PartNumber)
@@ -879,7 +1244,10 @@ pro = 1833 # strange!! problems (resolved)
 pro = 1820 # time consuming (resolved)
 pro = 1799 # have problems (resolved)
 pro = 1771 # small data
-pro = 114 # 
+pro = 114  # 
+pro = 1996 # small data
+pro = 1464 # soso
+pro = 279   #
 
 t1 = proc.time()
 for (pro in 1:length(compNameAppear)){
@@ -887,9 +1255,11 @@ for (pro in 1:length(compNameAppear)){
   print(paste(pro, length(compNameAppear), sep = "/"))
   componentName <- compNameAppear[pro]
   tM1 <- proc.time()
-  dataM <- dataArr(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
+  #   dataM <- dataArr(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
+  dataM <- dataArrC(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
   tM2 <- proc.time()
   tM2 - tM1
+  TC1 <- proc.time()
   if (!is.null(dataM)){
     datShipPro <- dataM[[3]]
     if (nrow(datShipPro) != 0){
@@ -935,13 +1305,16 @@ for (pro in 1:length(compNameAppear)){
         colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
       }
       names(nList) <- uniqueProduct
-      elected <- selectNi(dataM = dataM, YMD = ymd, minNi = 5)
+      #       elected <- selectNi(dataM = dataM, YMD = ymd, minNi = 5)
+      elected <- selectNiC(dataM = dataM, YMD = ymd, minNi = 5)
     }else{
       elected <- matrix(0, ncol = 7, nrow = 0)
     }
   }else{
     elected <- matrix(0, ncol = 7, nrow = 0)
   }
+  TC2 <- proc.time()
+  TC2 - TC1
 }
 t2 = proc.time()
 t2 - t1
