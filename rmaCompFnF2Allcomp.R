@@ -25,7 +25,7 @@ load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_shipping.RData")
 
-dat_all <- dat_all[-which(dat_all$Warranty_DT == "12:00:00 AM"), ]
+if (length(which(dat_all$Warranty_DT == "12:00:00 AM")) > 0)dat_all <- dat_all[-which(dat_all$Warranty_DT == "12:00:00 AM"), ]
 # ----- prediction of future (by month)
 dat_future_shipping <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\futureNshippingTest.csv", 
                                 header = TRUE)
@@ -377,6 +377,8 @@ probMapping <- function(tpIni, tpEnd, index, ftab, uniTimePointWithZero){
   return(prob)    
 }
 probMappingC <- cmpfun(probMapping)
+####
+
 # making nList (need: datShipPro, YMD, )
 datShipPro <- dataM[[3]]
 uniqueProduct <- as.character(unique(datShipPro$Product_Name))
