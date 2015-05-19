@@ -1,0 +1,11 @@
+library(Rmpi)
+# mpi.spawn.Rslaves(nslaves=4)
+# mpi.parReplicate(20, mean(rnorm(1000000)))
+# mpi.close.Rslaves()
+
+library(snow)
+cl <- makeCluster(4,type="MPI")
+result <- rep(NA,1000)
+system.time(sapply(1:1000,function(i) mean(rnorm(10000))))
+system.time(parSapply(cl,1:1000,function(i) mean(rnorm(10000))))
+stopCluster(cl)
