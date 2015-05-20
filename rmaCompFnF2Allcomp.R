@@ -80,6 +80,7 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
         warrantyDate <- strptime(paste(tmpWarr[1:3], collapse = "/"), "%Y/%m/%d")
       }else{
         warrantyDate <- strptime(paste(tmpWarr[1:3], collapse = "/"), "%m/%d/%Y")
+        if (is.na(warrantyDate))warrantyDate <- strptime( paste(tmpWarr[1:3], collapse = "/"), "%d/%m/%Y")
       }
       if (orderDate < warrantyDate){
         return("In")
