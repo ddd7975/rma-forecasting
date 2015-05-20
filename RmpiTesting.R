@@ -67,7 +67,7 @@ pt2 <- system.time({
         }
         names(nList) <- uniqueProduct
         #       elected <- selectNi(dataM = dataM, YMD = ymd, minNi = 5)
-        elected <- selectNiC(dataM = dataM, YMD = ymd, minNi = 5)
+        elected <- selectNi(dataM = dataM, YMD = ymd, minNi = 5, rmaNonparametric. = rmaNonparametric, uniqueProduct = uniqueProduct, nList = nList, x_mid = x_mid, x = x)
       }else{
         elected <- matrix(0, ncol = 7, nrow = 0)
       }

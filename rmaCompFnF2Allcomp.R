@@ -425,7 +425,9 @@ for (l in 1:length(nList)){
 names(nList) <- uniqueProduct
 # ----- Nonparametric Estimation
 # add input: currentDate
-rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, minNi = 5){
+bringList <- list(uniqueProduct, nList, x, x_mid)
+rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, minNi = 5, uniqueProduct = uniqueProduct, nList = nList, x_mid = x_mid, x = x){
+  dataComp_c <- dataM[[2]]
   # ----- Make the table, 1st column is time point, 2nd column is attribute. 
   # ----- 1. attribute = 1 means failure data
   # ----- 2. attribute = 2 means censored data in failure sheet 
@@ -678,7 +680,7 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
   })
   return(outtab)
 }
-rmaNonparametricC <- function(currentDate = currentDate, dataM, alpha = 0.05, minNi = 5){
+rmaNonparametricC <- function(currentDate = currentDate, dataM, alpha = 0.05, minNi = 5, uniqueProduct = uniqueProduct, nList = nList, x_mid = x_mid, x = x){
   # ----- Make the table, 1st column is time point, 2nd column is attribute. 
   # ----- 1. attribute = 1 means failure data
   # ----- 2. attribute = 2 means censored data in failure sheet 
@@ -932,7 +934,7 @@ rmaNonparametricC <- function(currentDate = currentDate, dataM, alpha = 0.05, mi
   return(outtab)
 }
 # ----- Selection mechanism
-selectNi <- function(dataM, YMD, minNi = 5){
+selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric. = rmaNonparametric, uniqueProduct = uniqueProduct, nList = nList, x_mid = x_mid, x = x){
   n_break <- dataM[[5]]
   minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
   
@@ -964,7 +966,7 @@ selectNi <- function(dataM, YMD, minNi = 5){
   
   
   for (i in 2:twoPeriod){
-    tmpStore <- apply(rmaNonparametric(xDate[i], dataM, minNi = minNi), 1, sum)
+    tmpStore <- apply(rmaNonparametric.(xDate[i], dataM, minNi = minNi, uniqueProduct = uniqueProduct, nList = nList, x_mid = x_mid, x = x), 1, sum)
     tmpEst[i] <- tmpStore[1]
     tmpLower[i] <- tmpStore[2]
     tmpUpper[i] <- tmpStore[3]
@@ -990,7 +992,7 @@ selectNi <- function(dataM, YMD, minNi = 5){
   
   if (length(xDate) > 24){
     for (i in 25:length(xDate)){
-      tmpStore <- apply(rmaNonparametric(xDate[i], dataM, minNi = minNi), 1, sum)
+      tmpStore <- apply(rmaNonparametric.(xDate[i], dataM, minNi = minNi, uniqueProduct = uniqueProduct, nList = nList, x_mid = x_mid, x = x), 1, sum)
       tmpEst[i] <- tmpStore[1]
       tmpLower[i] <- tmpStore[2]
       tmpUpper[i] <- tmpStore[3]
@@ -1081,7 +1083,7 @@ selectNi <- function(dataM, YMD, minNi = 5){
   dataFrame <- cbind(dataFrame, EstTs = est.ts)
   return(dataFrame)
 }
-selectNi2 <- function(dataM, YMD, minNi = 5){
+selectNi2 <- function(dataM, YMD, minNi = 5, rmaNonparametricC. = rmaNonparametricC, uniqueProduct = uniqueProduct, nList = nList, x_mid = x_mid, x = x){
   n_break <- dataM[[5]]
   minY <- dataM[[1]][1]; minM <- dataM[[1]][2]; minD <- dataM[[1]][3]
   
@@ -1113,7 +1115,7 @@ selectNi2 <- function(dataM, YMD, minNi = 5){
   
   
   for (i in 2:twoPeriod){
-    tmpStore <- apply(rmaNonparametricC(xDate[i], dataM, minNi = minNi), 1, sum)
+    tmpStore <- apply(rmaNonparametricC(xDate[i], dataM, minNi = minNi, uniqueProduct = uniqueProduct, nList = nList, x_mid = x_mid, x = x), 1, sum)
     tmpEst[i] <- tmpStore[1]
     tmpLower[i] <- tmpStore[2]
     tmpUpper[i] <- tmpStore[3]
@@ -1139,7 +1141,7 @@ selectNi2 <- function(dataM, YMD, minNi = 5){
   
   if (length(xDate) > 24){
     for (i in 25:length(xDate)){
-      tmpStore <- apply(rmaNonparametricC(xDate[i], dataM, minNi = minNi), 1, sum)
+      tmpStore <- apply(rmaNonparametricC.(xDate[i], dataM, minNi = minNi, uniqueProduct = uniqueProduct, nList = nList, x_mid = x_mid, x = x), 1, sum)
       tmpEst[i] <- tmpStore[1]
       tmpLower[i] <- tmpStore[2]
       tmpUpper[i] <- tmpStore[3]
