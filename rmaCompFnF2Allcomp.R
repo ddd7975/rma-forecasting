@@ -906,7 +906,6 @@ selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric)
       dat_censored1 <- dataM[[4]]
       n_break <- dataM[[5]]
       
-      YMD <- ymd
       endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
       x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
                              as.Date(endMonth), "months"))
@@ -1104,7 +1103,6 @@ selectNi2 <- function(dataM, YMD, minNi = 5, rmaNonparametricC = rmaNonparametri
       dat_censored1 <- dataM[[4]]
       n_break <- dataM[[5]]
       
-      YMD <- ymd
       endMonth <- seq(as.Date(paste(c(YMD, "01"), collapse = "/")), length = 2, by = "months")[2]
       x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
                              as.Date(endMonth), "months"))
@@ -1291,20 +1289,64 @@ selectNi2 <- function(dataM, YMD, minNi = 5, rmaNonparametricC = rmaNonparametri
   return(dataFrame)
 }
 selectNiC <- cmpfun(selectNi2)
-#---------------------------------------------------------------------------
-#---------------------------------------------------------------------------
-#---------------------------------------------------------------------------
-#---------------------------------------------------------------------------
 
+# ----- evaluation function
+evalFun <- function(elected, componentName){
+  if (nrow(elected) > 1){
+  ele <- elected[, c(3, 6, 7, 8, 9)]
+  # sum of cumulative 
+  cumulatedNon <- cumsum(elected[, "Est"] - elected[, "nb"])
+  cumulatedEmp <- cumsum(elected[, "Empirical"] - elected[, "nb"])
+  cumulatedMVTrend <- cumsum(elected[, "MVTrend"] - elected[, "nb"])
+  cumulatedM <- cumsum(elected[, "EstModified"] - elected[, "nb"])
+  cumulatedTs <- cumsum(elected[, "EstTs"] - elected[, "nb"])
+  len <- c((length(cumulatedNon) - 5):length(cumulatedNon))
+  cumulatedSum <- c(mean(cumulatedNon[len]), 
+                    mean(cumulatedEmp[len]), 
+                    mean(cumulatedMVTrend[len]), 
+                    mean(cumulatedM[len]), 
+                    mean(cumulatedTs[len]))
+  cumPositive <- which(cumulatedSum > 20)
+  cumEle <- which(cumulatedSum %in% (sort(cumulatedSum[cumPositive]))[c(1, 2)])
+  # proportion of shortage
+  proOfShortage <- c(sum(cumulatedEmp < 0)/length(cumulatedEmp),
+                     sum(cumulatedNon < 0)/length(cumulatedNon),
+                     sum(cumulatedMVTrend < 0)/length(cumulatedMVTrend),
+                     sum(cumulatedM < 0)/length(cumulatedM),
+                     sum(cumulatedTs < 0)/length(cumulatedTs))
+  
+  proEle <- which(proOfShortage %in% sort(proOfShortage)[c(1, 2)])
+  eleFinal <- intersect(cumEle, proEle)
+  #
+  minCumPos <- which(cumulatedSum == min(cumulatedSum[which(cumulatedSum > 0)]))
+  minShortage <- 
+    if (length(eleFinal) > 0){ # intersect is none
+      index <- which(proOfShortage == min(proOfShortage[eleFinal]))
+    }else if (length(minCumPos) > 0){
+      index <- minCumPos
+    }else{
+      index <- 5
+    }
+  outMatrix <- matrix(c(rep(componentName, nrow(ele)), as.character(elected[, 1]), ele[, index]), ncol = 3)
+  }else{
+    outMatrix <- matrix(c(componentName, "NoData", "NoData"), nrow = 1)
+  }
+  return(outMatrix)
+}
+#---------------------------------------------------------------------------
+#---------------------------------------------------------------------------
+#---------------------------------------------------------------------------
+#---------------------------------------------------------------------------
 # input1: date
-currentDate <- "2015/07" # for simulation
-ymd <- "2015/07"        # for last estimation
+currentDate <- "2015/08" # for simulation
+ymd <- "2015/08"        # for last estimation
 # input2: component name
 listfile <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\git-respository\\rma-forecasting\\rmaInventoryList.csv", header = TRUE)
 compName <- as.character(listfile[, 1])
 nonAppearIndex <- which(compName %in% dat_com$PartNumber)
 compNameAppear <- compName[nonAppearIndex]
 if ("" %in% compNameAppear){compNameAppear <- compNameAppear[-which(compNameAppear == "")]}
+
 
 pro = 16   # have problems (resolved)
 pro = 1700 # ok
@@ -1322,6 +1364,18 @@ pro = 1996 # small data
 pro = 1464 # soso
 pro = 279   #
 
+#  new version
+output1 <- lapply(1:length(compNameAppear), function(pro){
+  print(pro)
+  componentName <- compNameAppear[pro]
+  dataM <- dataArrC(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
+  elected <- selectNiC(dataM = dataM, YMD = ymd, minNi = 5, rmaNonparametricC = rmaNonparametricC)
+  out <- evalFun(elected, componentName)
+  return(out)
+})
+
+
+# old version
 t1 = proc.time()
 for (pro in 1:length(compNameAppear)){
   print(pro/length(compNameAppear))
@@ -1392,13 +1446,6 @@ for (pro in 1:length(compNameAppear)){
 t2 = proc.time()
 t2 - t1
 
-output1 <- lapply(1:length(compNameAppear), function(pro){
-  print(pro)
-  componentName <- compNameAppear[pro]
-  dataM <- dataArrC(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
-  elected <- selectNiC(dataM = dataM, YMD = ymd, minNi = 5, rmaNonparametricC = rmaNonparametricC)
-  return(elected)
-})
 ##
 ##
 plot(1:nrow(elected), elected[, "nb"], 
@@ -1454,3 +1501,9 @@ sum(cumulatedMVTrend < 0)/length(cumulatedMVTrend)
 sum(cumulatedM < 0)/length(cumulatedM)
 sum(cumulatedTs < 0)/length(cumulatedTs)
 
+# variation of shortage
+var(cumulatedEmp)
+var(cumulatedNon)
+var(cumulatedMVTrend)
+var(cumulatedM)
+var(cumulatedTs)
