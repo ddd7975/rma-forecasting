@@ -19,7 +19,8 @@ dat_shipping <- sqlQuery(conn, "SELECT [Shipping_DT], [Product_Name], [Qty], [Lo
 save(dat_all, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
 save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
 # save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/David79.Tseng/advantechProject/RMA/dat_com.RData")
-save(dat_shipping, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_future_shipping.RData")
+save(dat_shipping, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_shipping.RData")
+
 
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
@@ -30,6 +31,7 @@ if (length(which(dat_all$Warranty_DT == "12:00:00 AM")) > 0)dat_all <- dat_all[-
 dat_future_shipping <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\futureNshippingTest.csv", 
                                 header = TRUE)
 colnames(dat_future_shipping) <- c("Shipping_DT", "Product_Name", "Qty")
+save(dat_future_shipping, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_future_shipping.RData")
 # ------------------------------
 # ------------------------------
 library(dplyr)
@@ -1337,15 +1339,21 @@ evalFun <- function(elected, componentName){
 #---------------------------------------------------------------------------
 #---------------------------------------------------------------------------
 #---------------------------------------------------------------------------
+# source code
+source("AllFunction.R")
+
 # input1: date
 currentDate <- "2015/08" # for simulation
 ymd <- "2015/08"        # for last estimation
 # input2: component name
 listfile <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\git-respository\\rma-forecasting\\rmaInventoryList.csv", header = TRUE)
+save(listfile, file = "C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\git-respository\\rma-forecasting\\rma-forecasting\\rdata\\listfile.RData")
 compName <- as.character(listfile[, 1])
 nonAppearIndex <- which(compName %in% dat_com$PartNumber)
 compNameAppear <- compName[nonAppearIndex]
 if ("" %in% compNameAppear){compNameAppear <- compNameAppear[-which(compNameAppear == "")]}
+
+
 
 
 pro = 16   # have problems (resolved)

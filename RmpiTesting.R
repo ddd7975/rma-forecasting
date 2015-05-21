@@ -19,11 +19,12 @@ pt2 <- system.time({
 stopCluster(cl)
 
 pt1 <- system.time({
-  output1 <- sapply(1:100, function(pro){
+  output1 <- sapply(1:5, function(pro){
     print(pro)
     componentName <- compNameAppear[pro]
     dataM <- dataArrC(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
     elected <- selectNiC(dataM = dataM, YMD = ymd, minNi = 5, rmaNonparametricC = rmaNonparametricC)
-    return(elected)
+    out <- evalFun(elected, componentName)
+    return(out)
   })
 })
