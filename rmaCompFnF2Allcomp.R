@@ -1340,11 +1340,12 @@ evalFun <- function(elected, componentName){
 #---------------------------------------------------------------------------
 #---------------------------------------------------------------------------
 # source code
-source("AllFunction.R")
+source("allFunction.R")
 
 # input1: date
-currentDate <- "2015/08" # for simulation
-ymd <- "2015/08"        # for last estimation
+nowDate <- "2015/05" # for simulation
+twoYearDate <- seq(as.Date(paste(c(nowDate, "01"), collapse = "/")), length = 26, by = "months")
+ymd <- paste(strsplit(as.character(max(twoYearDate)), "-")[[1]][1:2], collapse = "/")
 # input2: component name
 listfile <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\git-respository\\rma-forecasting\\rmaInventoryList.csv", header = TRUE)
 save(listfile, file = "C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\git-respository\\rma-forecasting\\rma-forecasting\\rdata\\listfile.RData")

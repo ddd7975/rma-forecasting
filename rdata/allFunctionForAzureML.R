@@ -1251,7 +1251,7 @@ selectNi2 <- function(dataM, YMD, minNi = 5, rmaNonparametricC = rmaNonparametri
 selectNiC <- cmpfun(selectNi2)
 # ------------------------------
 # ----- evaluation function
-evalFun <- function(elected, componentName){
+evalFun <- function(elected, componentName, nowDate = nowDate){
   if (nrow(elected) > 1){
     ele <- elected[, c(3, 6, 7, 8, 9)]
     # sum of cumulative 
@@ -1292,10 +1292,20 @@ evalFun <- function(elected, componentName){
       }
     }else if (length(minCumPos) > 0){
       index <- minCumPos
+      if (length(minCumPos) > 1){
+        index <- minCumPos[which(proOfShortage[minCumPos] == min(proOfShortage[minCumPos]))]
+      }
     }else{
       index <- 5
     }
-    outMatrix <- matrix(c(rep(componentName, nrow(ele)), as.character(elected[, 1]), ele[, index]), ncol = 3)
+    # temp
+    if (length(index) > 1){index <- max(index)}
+    outMatrix1 <- matrix(c(rep(componentName, nrow(ele)), as.character(elected[, 1]), ele[, index]), ncol = 3)
+    
+    outMatrix2 <- matrix(c(componentName, 
+                           "LTB",
+                           sum(ele[(which(as.character(elected[, 1]) == nowDate) + 1):nrow(elected), index])), ncol = 3)
+    outMatrix <- rbind(outMatrix1, outMatrix2)
   }else{
     outMatrix <- matrix(c(componentName, "NoData", "NoData"), nrow = 1)
   }
