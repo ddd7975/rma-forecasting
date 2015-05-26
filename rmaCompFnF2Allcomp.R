@@ -1293,43 +1293,61 @@ selectNi2 <- function(dataM, YMD, minNi = 5, rmaNonparametricC = rmaNonparametri
 selectNiC <- cmpfun(selectNi2)
 
 # ----- evaluation function
-evalFun <- function(elected, componentName){
+evalFun <- function(elected, componentName, nowDate = nowDate){
   if (nrow(elected) > 1){
-  ele <- elected[, c(3, 6, 7, 8, 9)]
-  # sum of cumulative 
-  cumulatedNon <- cumsum(elected[, "Est"] - elected[, "nb"])
-  cumulatedEmp <- cumsum(elected[, "Empirical"] - elected[, "nb"])
-  cumulatedMVTrend <- cumsum(elected[, "MVTrend"] - elected[, "nb"])
-  cumulatedM <- cumsum(elected[, "EstModified"] - elected[, "nb"])
-  cumulatedTs <- cumsum(elected[, "EstTs"] - elected[, "nb"])
-  len <- c((length(cumulatedNon) - 5):length(cumulatedNon))
-  cumulatedSum <- c(mean(cumulatedNon[len]), 
-                    mean(cumulatedEmp[len]), 
-                    mean(cumulatedMVTrend[len]), 
-                    mean(cumulatedM[len]), 
-                    mean(cumulatedTs[len]))
-  cumPositive <- which(cumulatedSum > 20)
-  cumEle <- which(cumulatedSum %in% (sort(cumulatedSum[cumPositive]))[c(1, 2)])
-  # proportion of shortage
-  proOfShortage <- c(sum(cumulatedEmp < 0)/length(cumulatedEmp),
-                     sum(cumulatedNon < 0)/length(cumulatedNon),
-                     sum(cumulatedMVTrend < 0)/length(cumulatedMVTrend),
-                     sum(cumulatedM < 0)/length(cumulatedM),
-                     sum(cumulatedTs < 0)/length(cumulatedTs))
-  
-  proEle <- which(proOfShortage %in% sort(proOfShortage)[c(1, 2)])
-  eleFinal <- intersect(cumEle, proEle)
-  #
-  minCumPos <- which(cumulatedSum == min(cumulatedSum[which(cumulatedSum > 0)]))
-  minShortage <- 
+    ele <- elected[, c(3, 6, 7, 8, 9)]
+    # sum of cumulative 
+    cumulatedNon <- cumsum(elected[, "Est"] - elected[, "nb"])
+    cumulatedEmp <- cumsum(elected[, "Empirical"] - elected[, "nb"])
+    cumulatedMVTrend <- cumsum(elected[, "MVTrend"] - elected[, "nb"])
+    cumulatedM <- cumsum(elected[, "EstModified"] - elected[, "nb"])
+    cumulatedTs <- cumsum(elected[, "EstTs"] - elected[, "nb"])
+    len <- c((length(cumulatedNon) - 5):length(cumulatedNon))
+    cumulatedSum <- c(mean(cumulatedNon[len]), 
+                      mean(cumulatedEmp[len]), 
+                      mean(cumulatedMVTrend[len]), 
+                      mean(cumulatedM[len]), 
+                      mean(cumulatedTs[len]))
+    cumPositiveCri <- which(cumulatedSum > 20)
+    cumEle <- which(cumulatedSum %in% (sort(cumulatedSum[cumPositiveCri]))[c(1, 2)])
+    # proportion of shortage
+    proOfShortage <- c(sum(cumulatedEmp < 0)/length(cumulatedEmp),
+                       sum(cumulatedNon < 0)/length(cumulatedNon),
+                       sum(cumulatedMVTrend < 0)/length(cumulatedMVTrend),
+                       sum(cumulatedM < 0)/length(cumulatedM),
+                       sum(cumulatedTs < 0)/length(cumulatedTs))
+    
+    proEle <- which(proOfShortage %in% sort(proOfShortage)[c(1, 2)])
+    eleFinal <- intersect(cumEle, proEle)
+    #
+    cumPositive <- cumulatedSum[which(cumulatedSum > 0)]
+    if (length(cumPositive) > 0){
+      minCumPos <- which(cumulatedSum == min(cumulatedSum[which(cumulatedSum > 0)]))
+    }else{
+      minCumPos <- integer(0)
+    }
+    #
     if (length(eleFinal) > 0){ # intersect is none
       index <- which(proOfShortage == min(proOfShortage[eleFinal]))
+      if (length(index) > 1){
+        index <- which(cumulatedSum == min(cumulatedSum[index][which(cumulatedSum[index] > 0)]))
+      }
     }else if (length(minCumPos) > 0){
       index <- minCumPos
+      if (length(minCumPos) > 1){
+        index <- minCumPos[which(proOfShortage[minCumPos] == min(proOfShortage[minCumPos]))]
+      }
     }else{
       index <- 5
     }
-  outMatrix <- matrix(c(rep(componentName, nrow(ele)), as.character(elected[, 1]), ele[, index]), ncol = 3)
+    # temp
+    if (length(index) > 1){index <- max(index)}
+    outMatrix1 <- matrix(c(rep(componentName, nrow(ele)), as.character(elected[, 1]), ele[, index]), ncol = 3)
+    
+    outMatrix2 <- matrix(c(componentName, 
+                           "LTB",
+                           sum(ele[(which(as.character(elected[, 1]) == nowDate) + 1):nrow(elected), index])), ncol = 3)
+    outMatrix <- rbind(outMatrix1, outMatrix2)
   }else{
     outMatrix <- matrix(c(componentName, "NoData", "NoData"), nrow = 1)
   }
@@ -1374,12 +1392,12 @@ pro = 1464 # soso
 pro = 279   #
 
 #  new version
-output1 <- lapply(1:length(compNameAppear), function(pro){
+output1 <- lapply(1:5, function(pro){
   print(pro)
   componentName <- compNameAppear[pro]
   dataM <- dataArrC(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
   elected <- selectNiC(dataM = dataM, YMD = ymd, minNi = 5, rmaNonparametricC = rmaNonparametricC)
-  out <- evalFun(elected, componentName)
+  out <- evalFun(elected, componentName, nowDate)
   return(out)
 })
 
