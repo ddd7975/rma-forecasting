@@ -1392,7 +1392,7 @@ pro = 1464 # soso
 pro = 279   #
 
 #  new version
-output1 <- lapply(1:5, function(pro){
+output1 <- lapply(6:10, function(pro){
   print(pro)
   componentName <- compNameAppear[pro]
   dataM <- dataArrC(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = ymd)
