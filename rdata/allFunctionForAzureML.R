@@ -1,3 +1,4 @@
+library(compiler)
 # ------------------------------
 # ----- Data Arrangement
 dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shipping, dat_future_shipping = dat_future_shipping, componentName = componentName, YMD = YMD){
@@ -589,11 +590,14 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
       estLower <- sum((rev(n_ship) * probVectorLower)[1:lenLimit][restrict], na.rm = T)
       estUpper <- sum((rev(n_ship) * probVectorUpper)[1:lenLimit][restrict], na.rm = T)
       #
+      estAll <- sum((rev(n_ship) * probVector)[1:lenLimit], na.rm = T)
+      #
       estM <- sum((rev(n_ship)*probVectorM)[restrict], na.rm = T)
+      estMAll <- sum((rev(n_ship)*probVectorM), na.rm = T)
     }else{
-      est = estLower = estUpper = estM = 0
+      est = estLower = estUpper = estM = estAll = estMAll = 0
     }
-    return(c(est, estLower, estUpper, estM))
+    return(c(est, estLower, estUpper, estM, estAll, estMAll))
   })
   return(outtab)
 }
@@ -857,7 +861,7 @@ rmaNonparametricC <- function(currentDate = currentDate, dataM, alpha = 0.05, mi
 }
 # ------------------------------
 # ----- Selection mechanism
-selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric){
+selectNi2 <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric){
   if (!is.null(dataM)){
     datShipPro <- dataM[[3]]
     if (nrow(datShipPro) != 0){
@@ -917,10 +921,13 @@ selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric)
       
       #----- selection mechanism
       tmpEst <- 0
+      tmpEstAll <- 0
       tmpLower <- 0
       tmpUpper <- 0
       tmpTrendmv <- 0
+      tmpTrendmvAll <- 0
       tmpEstM <- 0
+      tmpEstMAll <- 0
       
       if (length(xDate) < 25){
         twoPeriod <- length(xDate)
@@ -934,7 +941,10 @@ selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric)
         tmpLower[i] <- tmpStore[2]
         tmpUpper[i] <- tmpStore[3]
         tmpTrendmv[i] <- tmpStore[1]
+        tmpTrendmvAll[i] <- tmpStore[1]
         tmpEstM[i] <- tmpStore[4]
+        tmpEstAll[i] <- tmpStore[5]
+        tmpEstMAll[i] <- tmpStore[6]
         
         if (i > 10){
           mean1 <- mean(n_break[(i - 1):(i - 5)])
@@ -950,6 +960,7 @@ selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric)
           ft4 <- mean5 - mean4
           ftMean <- mean(c(ft1, ft2, ft3, ft4))
           tmpTrendmv[i] <- mean(c(mean1 + ftMean,  sum(tmpStore[[1]])))
+          tmpTrendmvAll[i] <- mean(c(mean1 + ftMean,  sum(tmpStore[[5]])))
         }
       }
       
@@ -960,7 +971,10 @@ selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric)
           tmpLower[i] <- tmpStore[2]
           tmpUpper[i] <- tmpStore[3]
           tmpTrendmv[i] <- tmpStore[1]
+          tmpTrendmvAll[i] <- tmpStore[1]
           tmpEstM[i] <- tmpStore[4]
+          tmpEstAll[i] <- tmpStore[5]
+          tmpEstMAll[i] <- tmpStore[6]
           #
           mean1 <- mean(n_break[(i - 1):(i - 5)])
           mean2 <- mean(n_break[(i - 2):(i - 6)])
@@ -974,29 +988,37 @@ selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric)
           ft4 <- mean5 - mean4
           ftMean <- mean(c(ft1, ft2, ft3, ft4))
           tmpTrendmv[i] <- mean(c(mean1 + ftMean,  sum(tmpStore[[1]])))
+          tmpTrendmvAll[i] <- mean(c(mean1 + ftMean,  sum(tmpStore[[5]])))
         }
       }
       
-      EstStorage <- matrix(c(tmpEst, tmpLower, tmpUpper, tmpTrendmv, tmpEstM), ncol = 5)
+      EstStorage <- matrix(c(tmpEst, tmpEstAll, tmpTrendmv, tmpTrendmvAll, tmpEstM, tmpEstMAll), ncol = 6)
       
       # -----
       Est <- EstStorage[, 1]
-      Lower <- EstStorage[, 2]
-      Upper <- EstStorage[, 3]
+      EstAll <- EstStorage[, 2]
+      #       Lower <- EstStorage[, 2]
+      #       Upper <- EstStorage[, 3]
       nb <- c(as.numeric(n_break))
       #----
-      MVTrend <- EstStorage[, 4]
+      MVTrend <- EstStorage[, 3]
+      MVTrendAll <- EstStorage[, 4]
       EstModified <- EstStorage[, 5]
+      EstModifiedAll <- EstStorage[, 6]
       
-      dataFrame <- data.frame(x = xDate, nb = nb, Est = Est, Lower = Lower, Upper = Upper, 
-                              MVTrend = MVTrend, EstModified = EstModified, Empirical = dataM[[6]])
+      dataFrame <- data.frame(x = xDate, nb = nb, Empirical = dataM[[6]], 
+                              Est = Est, EstAll = EstAll, 
+                              MVTrend = MVTrend, MVTrendAll = MVTrendAll,
+                              EstModified = EstModified, EstModifiedAll = EstModifiedAll)
       ## use time series to let the estimation close to the truth.
       ## ind is set as 30, because the frequency in time series is set as 12, it need at least 2 period.
       ind <- 30
       est.ts <- rep(0, nrow(dataFrame))
+      est.ts.all <- rep(0, nrow(dataFrame))
       numOfTraceback <- 2
       if (nrow(dataFrame) >= ind){
         est.ts[1:(ind - 1)] <- dataFrame[1:(ind - 1), "EstModified"]
+        est.ts.all[1:(ind - 1)] <- dataFrame[1:(ind - 1), "EstModified"]
         #   current <- which(dataFrame[, 1] == currentDate)
         current <- nrow(dataFrame)
         if (length(current) == 0){
@@ -1011,6 +1033,12 @@ selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric)
             diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
             dValue <- mean(diffValue[(length(diffValue) - numOfTraceback):length(diffValue)])
             est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+            #
+            estTSAll <- ts(tmpTab[, "EstModifiedAll"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+            fitEAll <- stl(estTSAll, s.window="period")  
+            diffValueAll <- (fitEAll$time.series[, "trend"] - fitB$time.series[, "trend"])
+            dValueAll <- mean(diffValueAll[(length(diffValueAll) - numOfTraceback):length(diffValueAll)])
+            est.ts.all[r] <- dataFrame[r, "EstModifiedAll"] - dValueAll
           }
         }else{
           for (r in ind:nrow(dataFrame)){
@@ -1025,6 +1053,12 @@ selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric)
               diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
               dValue <- mean(diffValue[(length(diffValue) - numOfTraceback):length(diffValue)])
               est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+              #
+              estTSAll <- ts(tmpTab[, "EstModifiedAll"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+              fitEAll <- stl(estTSAll, s.window="period")  
+              diffValueAll <- (fitEAll$time.series[, "trend"] - fitB$time.series[, "trend"])
+              dValueAll <- mean(diffValueAll[(length(diffValueAll) - numOfTraceback):length(diffValueAll)])
+              est.ts.all[r] <- dataFrame[r, "EstModifiedAll"] - dValueAll
             }else{
               tmpTab <- dataFrame[1:current, ]
               endD <- as.character(tmpTab[current, 1])
@@ -1036,6 +1070,12 @@ selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric)
               diffValue <- (fitE$time.series[, "trend"] - fitB$time.series[, "trend"])
               dValue <- mean(diffValue[(length(diffValue) - numOfTraceback):length(diffValue)])
               est.ts[r] <- dataFrame[r, "EstModified"] - dValue
+              #
+              estTSAll <- ts(tmpTab[, "EstModifiedAll"], start=c(minY, minM), end=c(enddate[1], enddate[2]), frequency=12) 
+              fitEAll <- stl(estTSAll, s.window="period")  
+              diffValueAll <- (fitEAll$time.series[, "trend"] - fitB$time.series[, "trend"])
+              dValueAll <- mean(diffValueAll[(length(diffValueAll) - numOfTraceback):length(diffValueAll)])
+              est.ts.all[r] <- dataFrame[r, "EstModifiedAll"] - dValueAll
             }
           }
         }
@@ -1043,14 +1083,16 @@ selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric)
       
       neg <- which(est.ts < 0)
       if (length(neg) > 0){est.ts[neg] <- 0}
-      dataFrame <- cbind(dataFrame, EstTs = est.ts)
+      negAll <- which(est.ts.all < 0)
+      if (length(negAll) > 0){est.ts.all[negAll] <- 0}
+      dataFrame <- cbind(dataFrame, EstTs = est.ts, EstTsAll = est.ts.all)
       #         elected <- selectNiC(dataM = dataM, YMD = ymd, minNi = 5, rmaNonparametricC. = rmaNonparametricC, uniqueProduct = uniqueProduct, nList = nList, x_mid = x_mid, x = x)
       #       elected <- matrix(0, ncol = 7, nrow = 1)
     }else{
-      dataFrame <- matrix(0, ncol = 7, nrow = 1)
+      dataFrame <- matrix(0, ncol = 11, nrow = 1)
     }
   }else{
-    dataFrame <- matrix(0, ncol = 7, nrow = 1)
+    dataFrame <- matrix(0, ncol = 11, nrow = 1)
   }
   return(dataFrame)
 }

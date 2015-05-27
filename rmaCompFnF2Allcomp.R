@@ -1359,6 +1359,8 @@ evalFun <- function(elected, componentName, nowDate = nowDate){
 #---------------------------------------------------------------------------
 # source code
 source("allFunction.R")
+source("rdata\\allFunctionForAzureML.R")
+
 
 # input1: date
 nowDate <- "2015/05" # for simulation
