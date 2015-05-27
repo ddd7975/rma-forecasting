@@ -1318,7 +1318,11 @@ evalFun <- function(elected, componentName, nowDate = nowDate){
     cumulatedMVTrend <- cumsum(elected[, "MVTrend"] - elected[, "nb"])
     cumulatedM <- cumsum(elected[, "EstModified"] - elected[, "nb"])
     cumulatedTs <- cumsum(elected[, "EstTs"] - elected[, "nb"])
-    len <- c((length(cumulatedNon) - 5):length(cumulatedNon))
+    if (length(cumulatedNon) > 5){
+      len <- c((length(cumulatedNon) - 5):length(cumulatedNon))
+    }else{
+      len <- c(1:length(cumulatedNon))
+    }
     cumulatedSum <- c(mean(cumulatedEmp[len]), 
                       mean(cumulatedNon[len]), 
                       mean(cumulatedMVTrend[len]), 
@@ -1371,8 +1375,8 @@ evalFun <- function(elected, componentName, nowDate = nowDate){
                                ele[, index]), ncol = 3)
     }
     outMatrix2 <- matrix(c(componentName, 
-                         "LTBIW",
-                         sum(ele[(which(as.character(elected[, 1]) == nowDate) + 1):nrow(elected), index])), ncol = 3)
+                           "LTBIW",
+                           sum(ele[(which(as.character(elected[, 1]) == nowDate) + 1):nrow(elected), index])), ncol = 3)
     outMatrix3 <- matrix(c(componentName, 
                            "LTBOOW",
                            sum(ele[, index])), ncol = 3)
