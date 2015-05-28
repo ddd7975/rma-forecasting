@@ -1402,7 +1402,7 @@ output1 <- lapply(6:10, function(pro){
   out <- evalFun(elected, componentName, nowDate)
   return(out)
 })
-
+outTest <- do.call(rbind, output1)
 
 # old version
 t1 = proc.time()

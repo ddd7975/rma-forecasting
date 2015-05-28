@@ -1407,23 +1407,21 @@ evalFun <- function(elected, componentName, nowDate = nowDate){
     # temp
     outMatrix1 <- matrix(c(rep(componentName, nrow(ele)), as.character(elected[, 1]), ele[, index]), ncol = 3)
     if (index != 1){
-      outMatrix1.5 <- matrix(c(rep(componentName, nrow(ele)), 
-                               paste(as.character(elected[, 1]), "out", sep = "_"), 
-                               ele[, index + 1]), ncol = 3)
+      outMat1 <- cbind(outMatrix1, ele[, index + 1])
+      #       outMatrix1.5 <- matrix(c(rep(componentName, nrow(ele)), 
+      #                                paste(as.character(elected[, 1]), "out", sep = "_"), 
+      #                                ele[, index + 1]), ncol = 3)
     }else{
-      outMatrix1.5 <- matrix(c(rep(componentName, nrow(ele)), 
-                               paste(as.character(elected[, 1]), "out", sep = "_"), 
-                               ele[, index]), ncol = 3)
+      outMat1 <- cbind(outMatrix1, ele[, index])
     }
+    
     outMatrix2 <- matrix(c(componentName, 
-                           "LTBIW",
+                           "LTB",
                            sum(ele[(which(as.character(elected[, 1]) == nowDate) + 1):nrow(elected), index])), ncol = 3)
-    outMatrix3 <- matrix(c(componentName, 
-                           "LTBOOW",
-                           sum(ele[, index])), ncol = 3)
-    outMatrix <- rbind(outMatrix1, outMatrix1.5, outMatrix2, outMatrix3)
+    outMat2 <- cbind(outMatrix2, sum(ele[, index]))
+    outMatrix <- rbind(outMat1, outMat2)
   }else{
-    outMatrix <- matrix(c(componentName, "NoData", "NoData"), nrow = 1)
+    outMatrix <- matrix(c(componentName, "NoData", "NoData", "NoData"), nrow = 1)
   }
   return(outMatrix)
 }
