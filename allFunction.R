@@ -1341,9 +1341,15 @@ selectNi2 <- function(dataM, YMD, minNi = 5, rmaNonparametricC = rmaNonparametri
       #       elected <- matrix(0, ncol = 7, nrow = 1)
     }else{
       dataFrame <- matrix(0, ncol = 11, nrow = 1)
+      colnames(dataFrame) <- c("x", "nb", "Empirical", "Est", "EstAll", "MVTrend", "MVTrendAll", 
+                               "EstModified", "EstModifiedAll", "EstTs", "EstTsAll")
+      dataFrame <- as.data.frame(dataFrame)
     }
   }else{
     dataFrame <- matrix(0, ncol = 11, nrow = 1)
+    colnames(dataFrame) <- c("x", "nb", "Empirical", "Est", "EstAll", "MVTrend", "MVTrendAll", 
+                             "EstModified", "EstModifiedAll", "EstTs", "EstTsAll")
+    dataFrame <- as.data.frame(dataFrame)
   }
   return(dataFrame)
 }
@@ -1408,7 +1414,6 @@ evalFun <- function(elected, componentName, nowDate = nowDate){
     outMatrix1 <- matrix(c(rep(componentName, nrow(ele)), as.character(elected[, 1]), ele[, index]), ncol = 3)
     if (index != 1){
       outMat1 <- cbind(outMatrix1, ele[, index + 1])
-      #       outMatrix1.5 <- matrix(c(rep(componentName, nrow(ele)), 
       #                                paste(as.character(elected[, 1]), "out", sep = "_"), 
       #                                ele[, index + 1]), ncol = 3)
     }else{
