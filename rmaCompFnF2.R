@@ -1255,6 +1255,7 @@ componentName <- "1124518191"
 componentName <- "1653000016"
 componentName <- "9680013278"
 componentName <- "14S4860600"
+componentName <- "1100003784"
 partnumber <- unique(as.character(dat_com$PartNumber))
 componentName <- partnumber[32]
 

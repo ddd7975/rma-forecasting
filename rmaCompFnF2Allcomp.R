@@ -1412,7 +1412,7 @@ ymd <- paste(strsplit(as.character(max(twoYearDate)), "-")[[1]][1:2], collapse =
 listfile <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\git-respository\\rma-forecasting\\rmaInventoryList.csv", header = TRUE)
 #save(listfile, file = "C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\git-respository\\rma-forecasting\\rma-forecasting\\rdata\\listfile.RData")
 compName <- as.character(listfile[, 1])
-nonAppearIndex <- which(compName %in% dat_com$PartNumber)
+nonAppearIndex <- which(compName %in% unique(dat_com$PartNumber))
 compNameAppear <- compName[nonAppearIndex]
 if ("" %in% compNameAppear){compNameAppear <- compNameAppear[-which(compNameAppear == "")]}
 
@@ -1434,6 +1434,10 @@ pro = 114  #
 pro = 1996 # small data
 pro = 1464 # soso
 pro = 279   #
+
+# scratch data by Region from raw data (dat_all, dat_com, dat_shipping, dat_future_shipping)
+
+
 
 #  new version
 output1 <- lapply(1:10, function(pro){
