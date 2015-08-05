@@ -212,7 +212,7 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
           estEmpirical[i] <- mean(c(n_break[i - 1], n_break[i - 2], n_break[i - 3]))
         }
       }
-      return(list(c(minY, minM, minD), dataComp_c, datShipPro, dat_censored1, n_break, estEmpirical))
+      return(list(minDate = c(minY, minM, minD), compBelongProduct = dataComp_c, productShip = datShipPro, censoreData = dat_censored1, numOfBreak = n_break, movingAverage = estEmpirical))
     }else{
       return (NULL)
     }
@@ -398,16 +398,20 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
       belongMonth <- strptime(endCurrent, "%Y-%m-%d") - strptime(dataComp_c_part$MES_Shipping_Dt_withDay, "%Y/%m/%d")
       belongTime <- 0
       if (length(belongMonth) != 0){
-        for (i in 1:length(belongMonth)){
-          belongTime[i] <- lf_nonBroken[max(which(belongMonth[i] <= lf_Month))]
-        }
+        belongTime <- sapply(1:length(belongMonth), function(i){
+          lf_nonBroken[max(which(belongMonth[i] <= lf_Month))]
+        })
+        #         for (i in 1:length(belongMonth)){
+        #           belongTime[i] <- 
+        #         }
       }
       #
       censoredPro <- dat_censored1[which(dat_censored1$Product_Name == proName), ]
       if (nrow(censoredPro) != 0){
         lf_censored1 <- strptime(rep(currentDate, nrow(censoredPro)), "%Y/%m/%d") - strptime(censoredPro$MES_Shipping_Dt_withDay, "%Y/%m/%d")
         ##
-        ## ---- Because lf_censored1 is build before input the YMD, so it may include the shipping date after than the YMD, so the value will be negative.
+        ## ---- Because lf_censored1 is build before input the YMD, 
+        ##      so it may include the shipping date after than the YMD, so the value will be negative.
         ##
         lf_censored1_part <- lf_censored1[which(lf_censored1 > 0)]
         dat_attr2 <- as.data.frame(cbind(lifeTime = as.numeric(lf_censored1_part), attribute = rep("2", length(lf_censored1_part))))
@@ -445,10 +449,10 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
       rownames(failureTable) <- c(0, uniTimePoint)
       colnames(failureTable) <- c("di", "ri", "ni", "1-pi", "F(ti)", "Lower", "Upper")
       
+      qtyPart <- as.numeric(dataComp_c_part$qty)
       for (l in 1:length(belongTime)){
         loc <- which(belongTime[l] == c(0, uniTimePoint))
-        #         tmp[l] <- loc
-        failureTable[loc, 2] <- failureTable[loc, 2] - 1
+        failureTable[loc, 2] <- failureTable[loc, 2] - qtyPart[l]
       }
       
       if (min(failureTable[, 2]) < 0){
@@ -517,7 +521,6 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
             failureTable[m, j] <- failureTable[lastDiLargeN[length(lastDiLargeN)], j]
           }
         }
-        
         ##
         ## failureTable has only one di, so the F(ti) will be the same, it will let the prob all be zero.
         ##
@@ -606,14 +609,11 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
       estLower <- sum((rev(n_ship) * probVectorLower)[1:lenLimit][restrict], na.rm = T)
       estUpper <- sum((rev(n_ship) * probVectorUpper)[1:lenLimit][restrict], na.rm = T)
       #
-      estAll <- sum((rev(n_ship) * probVector)[1:lenLimit], na.rm = T)
-      #
       estM <- sum((rev(n_ship)*probVectorM)[restrict], na.rm = T)
-      estMAll <- sum((rev(n_ship)*probVectorM), na.rm = T)
     }else{
-      est = estLower = estUpper = estM = estAll = estMAll = 0
+      est = estLower = estUpper = estM = 0
     }
-    return(c(est, estLower, estUpper, estM, estAll, estMAll))
+    return(c(est, estLower, estUpper, estM))
   })
   return(outtab)
 }

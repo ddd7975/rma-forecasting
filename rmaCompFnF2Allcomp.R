@@ -1,37 +1,59 @@
 library(Rmpi)
 library(snow)
-library(RODBC)
-conn <- odbcConnect(dsn = "eRMA", uid = "David79", pwd = "d@v1d79")
-
-dat_all <- sqlQuery(conn, "SELECT Product_Name, Order_DT, Barcode, Warranty_DT, Receive_DT, 
-                    Ship_DT, MES_Shipping_DT, Order_No, item_No, warranty_Type
-                    FROM [SBA].[dbo].[eRMA_All]")
-
-dat_com <- sqlQuery(conn, "SELECT [Order_No]
-                    ,[Item_No]
-                    ,[PartNumber]
-                    ,[Qty]
-                    FROM [SBA].[dbo].[eRMA_Consumption_All]")
-
-dat_shipping <- sqlQuery(conn, "SELECT [Shipping_DT], [Product_Name], [Qty], [Location]
-                         FROM [SBA].[dbo].[EAI_Shipping]")
-
-save(dat_all, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
-save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
-# save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/David79.Tseng/advantechProject/RMA/dat_com.RData")
-save(dat_shipping, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_shipping.RData")
+# library(RODBC)
+# conn <- odbcConnect(dsn = "eRMA", uid = "David79", pwd = "d@v1d79")
+# 
+# dat_all <- sqlQuery(conn, "SELECT Product_Name, Order_DT, Barcode, Warranty_DT, Receive_DT, 
+#                     Ship_DT, MES_Shipping_DT, Order_No, item_No, warranty_Type
+#                     FROM [SBA].[dbo].[eRMA_All]")
+# 
+# dat_com <- sqlQuery(conn, "SELECT [Order_No]
+#                     ,[Item_No]
+#                     ,[PartNumber]
+#                     ,[Qty]
+#                     FROM [SBA].[dbo].[eRMA_Consumption_All]")
+# 
+# dat_shipping <- sqlQuery(conn, "SELECT [Shipping_DT], [Product_Name], [Qty], [Location]
+#                          FROM [SBA].[dbo].[EAI_Shipping]")
+# dat_future_shipping <- sqlQuery(conn, "select aa.item_no,
+#                                        Ship_Site,
+#                                        fact_zone as [Region],
+#                                 substring(convert(char,efftive_DATE,112),1,6) as [Shipping_DT],
+#                                 cust_country,
+#                                 aa.site_id as [site_id],
+#                                 yesNo [bookOrNot],
+#                                 bb.DescDesc,
+#                                 sum(qty) as [Qty]
+#                                 from zBacklog aa (nolock) left join dimension.dbo.mara2 bb (nolock) 
+#                                 on aa.item_no = bb.matnr  
+#                                 where efftive_date between '2015/7/1' and '2018/12/31'  
+#                                 and tran_type = 'Backlog'  
+#                                 and fact_1234 = '1'  
+#                                 and bomseq >= 0  and breakdown <= 0  
+#                                 and itp_find <> 2  
+#                                 and itp_find <> 9   
+#                                 and ( qty <> 0 or us_amt <> 0 ) 
+#                                 group by aa.item_no,Ship_Site,fact_zone,
+#                                 substring(convert(char,efftive_DATE,112),1,6),
+#                                 cust_country,aa.site_id,yesNo,bb.DescDesc 
+#                                 order by 1,2,3,4,5
+#                                 ")
+#save(dat_all, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
+#save(dat_com, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
+#save(dat_shipping, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_shipping.RData")
 
 
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_com.RData")
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_all.RData")
 load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_shipping.RData")
+load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_future_shipping.RData")
 
 if (length(which(dat_all$Warranty_DT == "12:00:00 AM")) > 0)dat_all <- dat_all[-which(dat_all$Warranty_DT == "12:00:00 AM"), ]
 # ----- prediction of future (by month)
-dat_future_shipping <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\futureNshippingTest.csv", 
-                                header = TRUE)
-colnames(dat_future_shipping) <- c("Shipping_DT", "Product_Name", "Qty")
-save(dat_future_shipping, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_future_shipping.RData")
+# dat_future_shipping <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\futureNshippingTest.csv", 
+#                                 header = TRUE)
+# colnames(dat_future_shipping) <- c("Shipping_DT", "Product_Name", "Qty")
+# save(dat_future_shipping, file = "C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_future_shipping.RData")
 # ------------------------------
 # ------------------------------
 library(dplyr)
@@ -44,7 +66,7 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
   dat_com_i <- dat_com[which(dat_com$PartNumber == componentName), ] # decide a part number
   qty <- as.character(dat_com_i$Qty) 
   qty[which(qty == "")] <- 1 # if qty is blank, change it to 1
-  qty[which(qty == "1-")] <- -1 # if qty is "1-", change it to 1
+  qty[which(qty == "1-")] <- 1 # if qty is "1-", change it to 1
   positiveQtyNo <- which(suppressWarnings(as.numeric(qty)) > 0) # 
   dat_com_i$Qty <- qty
   dat_com_iPos <- dat_com_i[positiveQtyNo, ]
@@ -237,7 +259,7 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
           estEmpirical[i] <- mean(c(n_break[i - 1], n_break[i - 2], n_break[i - 3]))
         }
       }
-      return(list(c(minY, minM, minD), dataComp_c, datShipPro, dat_censored1, n_break, estEmpirical))
+      return(list(minDate = c(minY, minM, minD), compBelongProduct = dataComp_c, productShip = datShipPro, censoreData = dat_censored1, numOfBreak = n_break, movingAverage = estEmpirical))
     }else{
       return (NULL)
     }
@@ -423,16 +445,20 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
       belongMonth <- strptime(endCurrent, "%Y-%m-%d") - strptime(dataComp_c_part$MES_Shipping_Dt_withDay, "%Y/%m/%d")
       belongTime <- 0
       if (length(belongMonth) != 0){
-        for (i in 1:length(belongMonth)){
-          belongTime[i] <- lf_nonBroken[max(which(belongMonth[i] <= lf_Month))]
-        }
+        belongTime <- sapply(1:length(belongMonth), function(i){
+          lf_nonBroken[max(which(belongMonth[i] <= lf_Month))]
+        })
+        #         for (i in 1:length(belongMonth)){
+        #           belongTime[i] <- 
+        #         }
       }
       #
       censoredPro <- dat_censored1[which(dat_censored1$Product_Name == proName), ]
       if (nrow(censoredPro) != 0){
         lf_censored1 <- strptime(rep(currentDate, nrow(censoredPro)), "%Y/%m/%d") - strptime(censoredPro$MES_Shipping_Dt_withDay, "%Y/%m/%d")
         ##
-        ## ---- Because lf_censored1 is build before input the YMD, so it may include the shipping date after than the YMD, so the value will be negative.
+        ## ---- Because lf_censored1 is build before input the YMD, 
+        ##      so it may include the shipping date after than the YMD, so the value will be negative.
         ##
         lf_censored1_part <- lf_censored1[which(lf_censored1 > 0)]
         dat_attr2 <- as.data.frame(cbind(lifeTime = as.numeric(lf_censored1_part), attribute = rep("2", length(lf_censored1_part))))
@@ -470,10 +496,10 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
       rownames(failureTable) <- c(0, uniTimePoint)
       colnames(failureTable) <- c("di", "ri", "ni", "1-pi", "F(ti)", "Lower", "Upper")
       
+      qtyPart <- as.numeric(dataComp_c_part$qty)
       for (l in 1:length(belongTime)){
         loc <- which(belongTime[l] == c(0, uniTimePoint))
-        #         tmp[l] <- loc
-        failureTable[loc, 2] <- failureTable[loc, 2] - 1
+        failureTable[loc, 2] <- failureTable[loc, 2] - qtyPart[l]
       }
       
       if (min(failureTable[, 2]) < 0){
@@ -542,7 +568,6 @@ rmaNonparametric <- function(currentDate = currentDate, dataM, alpha = 0.05, min
             failureTable[m, j] <- failureTable[lastDiLargeN[length(lastDiLargeN)], j]
           }
         }
-        
         ##
         ## failureTable has only one di, so the F(ti) will be the same, it will let the prob all be zero.
         ##
@@ -912,43 +937,53 @@ selectNi <- function(dataM, YMD, minNi = 5, rmaNonparametric = rmaNonparametric)
       x1 <- as.character(seq(as.Date(paste(c(minY, minM, minD), collapse = "/")), 
                              as.Date(endMonth), "months"))
       
-      x <- as.character(sapply(x1, function(y){
+      xtmp <- as.character(sapply(x1, function(y){
         tmp <- strsplit(y, "-")[[1]]
         tmp[3] <- "01"
+        tmp1 <- paste(tmp[1], tmp[2], sep="/")
         tmp2 <- paste(tmp[1], tmp[2], tmp[3], sep="/")
-        return(tmp2)
+        return(c(tmp1, tmp2))
       }))
-      
+      xmat <- matrix(xtmp, ncol = 2, byrow = T)      
+      x <- xmat[, 2]
       # ----- split the x so that it can match the dat_shipping (because dat_shipping only record the amount by month)
-      x_split <- 0
-      for (i in 1:length(x)){
+      #       x_split <- 0
+      #       for (i in 1:length(x)){
+      #         tmp <- strsplit(x[i], "/")[[1]]
+      #         x_split[i] <- paste0(tmp[1], tmp[2])
+      #       }
+      x_split <- sapply(1:length(x), function(i){
         tmp <- strsplit(x[i], "/")[[1]]
-        x_split[i] <- paste0(tmp[1], tmp[2])
-      }
+        return(paste0(tmp[1], tmp[2]))
+      })
+      #       x_mid <- sapply(1:length(x), function(i){
+      #         tmpd <- strsplit(x[i], "/")[[1]]
+      #         tmpd[3] <- "15"
+      #         paste(tmpd, collapse = "/")
+      #       })
       x_mid <- sapply(1:length(x), function(i){
         tmpd <- strsplit(x[i], "/")[[1]]
         tmpd[3] <- "15"
-        paste(tmpd, collapse = "/")
+        return(paste(tmpd, collapse = "/"))
       })
       nList <- lapply(1:length(uniqueProduct), function(i){
         datShipPro_i <- datShipPro[which(datShipPro$Product_Name == uniqueProduct[i]), ]
         n_ship <- sapply(1:(length(x_split)), function(j){
           return(max(sum(datShipPro_i[which(datShipPro_i$Shipping_DT == x_split[j]), "Qty"]), 0))
         })
-        return(matrix(n_ship, nrow=1))
+        out <- matrix(n_ship, nrow=1)
+        colnames(out) <- x_mid[1:(length(x_mid))]
+        return(out)
       })
-      for (l in 1:length(nList)){
-        colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
-      }
+      #       for (l in 1:length(nList)){
+      #         colnames(nList[[l]]) <- x_mid[1:(length(x_mid))]
+      #       }
       names(nList) <- uniqueProduct
       dataComp_c <- dataM[[2]]
       #########
-      x <- as.character(sapply(x1, function(y){
-        tmp <- strsplit(y, "-")[[1]]
-        tmp[3] <- "01"
-        tmp2 <- paste(tmp[1], tmp[2], sep="/")
-        return(tmp2)
-      }))
+      x <- xmat[, 1]
+      
+      
       if (minD != 1){
         x <- c(x, YMD)
       }
@@ -1405,7 +1440,7 @@ source("rdata\\allFunctionForAzureML.R")
 
 
 # input1: date
-nowDate <- "2015/05" # for simulation
+nowDate <- "2015/07" # for simulation
 twoYearDate <- seq(as.Date(paste(c(nowDate, "01"), collapse = "/")), length = 26, by = "months")
 ymd <- paste(strsplit(as.character(max(twoYearDate)), "-")[[1]][1:2], collapse = "/")
 # input2: component name
@@ -1437,7 +1472,7 @@ pro = 279   #
 
 # scratch data by Region from raw data (dat_all, dat_com, dat_shipping, dat_future_shipping)
 
-
+componentName <- "trek-550-lg"
 
 #  new version
 output1 <- lapply(1:10, function(pro){

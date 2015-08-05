@@ -27,9 +27,9 @@ load("C:/Users/David79.Tseng/Dropbox/HomeOffice/rmaTest/dat_shipping.RData")
 
 dat_all <- dat_all[-which(dat_all$Warranty_DT == "12:00:00 AM"), ]
 # ----- prediction of future (by month)
-dat_future_shipping <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\futureNshippingTest.csv", 
+dat_future_shipping_fake <- read.csv("C:\\Users\\David79.Tseng\\Dropbox\\David79.Tseng\\advantechProject\\RMA\\futureNshippingTest.csv", 
                                 header = TRUE)
-colnames(dat_future_shipping) <- c("Shipping_DT", "Product_Name", "Qty")
+colnames(dat_future_shipping_fake) <- c("Shipping_DT", "Product_Name", "Qty")
 # ------------------------------
 # ------------------------------
 library(dplyr)
@@ -230,7 +230,7 @@ dataArr <- function(dat_all = dat_all, dat_com = dat_com, dat_shipping = dat_shi
         estEmpirical[i] <- mean(c(n_break[i - 1], n_break[i - 2], n_break[i - 3]))
       }
     }
-    return(list(c(minY, minM, minD), dataComp_c, datShipPro, dat_censored1, n_break, estEmpirical))
+    return(list(minDate = c(minY, minM, minD), compBelongProduct = dataComp_c, productShip = datShipPro, censoreData = dat_censored1, numOfBreak = n_break, movingAverage = estEmpirical))
   }else{
     return (NULL)
   }
